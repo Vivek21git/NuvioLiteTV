@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,10 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+@OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
 
     private var playerManager: LowRamPlayerManager? = null
@@ -153,7 +155,6 @@ class PlayerActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Minimalist Control Overlay (Matching Image 2)
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
@@ -173,7 +174,6 @@ class PlayerActivity : ComponentActivity() {
                             )
                         )
                 ) {
-                    // Top Title (Matching Image 2 top left)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -188,14 +188,12 @@ class PlayerActivity : ComponentActivity() {
                         )
                     }
 
-                    // Bottom Seekbar & Controls (Matching Image 2)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 48.dp, vertical = 32.dp)
                     ) {
-                        // Clean White Timeline Slider
                         val progressFraction = if (duration > 0) {
                             (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                         } else 0f
@@ -220,7 +218,6 @@ class PlayerActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Timestamps row: 23:13                               45:20
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -241,13 +238,11 @@ class PlayerActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Controls: |<   -10s   ||   +10s   >|
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Prev chapter
                             Text(
                                 text = "|◁",
                                 color = Color(0xAAFFFFFF),
@@ -259,7 +254,6 @@ class PlayerActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.width(16.dp))
 
-                            // -10s Jump
                             Text(
                                 text = "↺ 10",
                                 color = Color.White,
@@ -271,7 +265,6 @@ class PlayerActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.width(20.dp))
 
-                            // Play / Pause Circle
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -292,7 +285,6 @@ class PlayerActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.width(20.dp))
 
-                            // +10s Jump
                             Text(
                                 text = "10 ↻",
                                 color = Color.White,
@@ -304,7 +296,6 @@ class PlayerActivity : ComponentActivity() {
 
                             Spacer(modifier = Modifier.width(16.dp))
 
-                            // Next
                             Text(
                                 text = "▷|",
                                 color = Color(0xAAFFFFFF),
