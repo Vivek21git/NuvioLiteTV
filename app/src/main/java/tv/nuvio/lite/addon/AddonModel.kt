@@ -14,3 +14,9 @@ data class InstalledAddon(
     val transportUrl: String,
     val description: String? = null
 )
+
+data class StreamLink(
+    val addonName: String,
+    val title: String,
+    val url: String
+)
