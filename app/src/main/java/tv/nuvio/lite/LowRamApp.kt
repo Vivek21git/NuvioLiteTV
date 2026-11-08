@@ -42,12 +42,11 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
             .setTargetBufferBytes(if (isLowRam) 12 * 1024 * 1024 else 35 * 1024 * 1024)
             .build()
 
-        // High-compatibility HTTP source that enables chunk seeking & custom ranges
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(8_000)
             .setReadTimeoutMs(10_000)
-            .setUserAgent("NuvioTV/2.0 (Android TV)")
+            .setUserAgent("NuvioTV/2.0")
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
@@ -59,7 +58,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
             .setMediaSourceFactory(mediaSourceFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            // Snaps immediately to the nearest keyframe for instantaneous forward/rewind
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .build().apply {
                 playWhenReady = true
@@ -76,7 +74,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
         player.prepare()
     }
 
-    // Handles live-streams and custom chunks without freezing
     fun seekRelative(offsetMs: Long) {
         val current = player.currentPosition
         val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
@@ -127,7 +124,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
 
     fun getVideoQualityInfo(): String {
         val format = player.videoFormat ?: return "HD"
-        val width = format.width
         val height = format.height
         return when {
             height >= 2160 -> "4K UHD"
