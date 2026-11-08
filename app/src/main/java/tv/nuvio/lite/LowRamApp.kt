@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.BitmapFactoryDecoder
+import coil.memory.MemoryCache
 
 class LowRamApp : Application(), ImageLoaderFactory {
 
@@ -21,7 +22,11 @@ class LowRamApp : Application(), ImageLoaderFactory {
             .components {
                 add(BitmapFactoryDecoder.Factory())
             }
-            .memoryCachePercent(if (isLowRamDevice) 0.10 else 0.25)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(if (isLowRamDevice) 0.10 else 0.25)
+                    .build()
+            }
             .crossfade(false)
             .build()
     }
