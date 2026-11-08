@@ -35,7 +35,6 @@ import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.NavSection
 import tv.nuvio.lite.addon.StreamLink
 
-// Glass Theme Constants
 val GlassSurface = Color(0x24FFFFFF)
 val GlassSurfaceElevated = Color(0x38FFFFFF)
 val GlassBorder = Color(0x40FFFFFF)
@@ -74,19 +73,17 @@ fun TvHomeScreen(
             .fillMaxSize()
             .background(BackgroundDeep)
     ) {
-        // --- 1. GLASS SIDEBAR ---
         GlassSidebar(
             selectedSection = currentSection,
             isLowRam = isLowRam,
-            onSelectSection = {
-                currentSection = it
-                if (it == NavSection.ADDONS) {
+            onSelectSection = { section ->
+                currentSection = section
+                if (section == NavSection.ADDONS) {
                     showAddonDialog = true
                 }
             }
         )
 
-        // --- 2. MAIN CONTENT AREA ---
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -94,7 +91,6 @@ fun TvHomeScreen(
                 .padding(end = 16.dp, top = 16.dp, bottom = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Frosted Glass Search Bar Header
                 GlassSearchBar(
                     query = searchQuery,
                     onQueryChange = {
@@ -106,37 +102,40 @@ fun TvHomeScreen(
                         .padding(bottom = 16.dp)
                 )
 
-                // Smooth Section Switching Animations
-                AnimatedContent(
-                    targetState = Pair(currentSection, searchQuery.isNotBlank()),
-                    transitionSpec = {
-                        fadeIn(spring(stiffness = Spring.StiffnessLow)) + slideInVertically { it / 8 } togetherWith
-                                fadeOut(spring(stiffness = Spring.StiffnessLow))
-                    },
-                    label = "sectionTransition"
-                ) { (section, isSearching) ->
-                    if (isSearching) {
-                        CatalogGrid(
-                            title = "Search Results",
-                            items = searchResults,
-                            isLowRam = isLowRam,
-                            onSelect = onSelectContent
-                        )
-                    } else {
-                        when (section) {
-                            NavSection.MOVIES -> CatalogGrid("Featured Movies", movies, isLowRam, onSelectContent)
-                            NavSection.SERIES -> CatalogGrid("Trending Series", series, isLowRam, onSelectContent)
-                            NavSection.WATCHLIST -> CatalogGrid("My Watchlist", watchlist, isLowRam, onSelectContent)
-                            NavSection.ADDONS -> {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Button(
-                                        onClick = { showAddonDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = GlassBorderActive)
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF3B82F6))
+                    }
+                } else {
+                    AnimatedContent(
+                        targetState = Pair(currentSection, searchQuery.isNotBlank()),
+                        transitionSpec = {
+                            fadeIn(spring(stiffness = Spring.StiffnessLow)) + slideInVertically { it / 8 } togetherWith
+                                    fadeOut(spring(stiffness = Spring.StiffnessLow))
+                        },
+                        label = "sectionTransition"
+                    ) { (section, isSearching) ->
+                        if (isSearching) {
+                            CatalogGrid("Search Results", searchResults, isLowRam, onSelectContent)
+                        } else {
+                            when (section) {
+                                NavSection.MOVIES -> CatalogGrid("Featured Movies", movies, isLowRam, onSelectContent)
+                                NavSection.SERIES -> CatalogGrid("Trending Series", series, isLowRam, onSelectContent)
+                                NavSection.WATCHLIST -> CatalogGrid("My Watchlist", watchlist, isLowRam, onSelectContent)
+                                NavSection.ADDONS -> {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text("Open Add-ons Manager (${installedAddons.size})")
+                                        Button(
+                                            onClick = { showAddonDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GlassBorderActive)
+                                        ) {
+                                            Text("Open Add-ons Manager (${installedAddons.size})", color = Color.White)
+                                        }
                                     }
                                 }
                             }
@@ -147,7 +146,6 @@ fun TvHomeScreen(
         }
     }
 
-    // Detail Modal with Watchlist Toggle & Player Option
     selectedItem?.let { item ->
         DetailsGlassDialog(
             item = item,
@@ -161,7 +159,6 @@ fun TvHomeScreen(
         )
     }
 
-    // Addons Manager Modal
     if (showAddonDialog) {
         AddonManagerDialog(
             addons = installedAddons,
@@ -175,7 +172,6 @@ fun TvHomeScreen(
     }
 }
 
-// --- GLASS SIDEBAR COMPONENT ---
 @Composable
 fun GlassSidebar(
     selectedSection: NavSection,
@@ -192,10 +188,9 @@ fun GlassSidebar(
             .clip(RoundedCornerShape(20.dp))
             .background(sidebarBg)
             .border(1.dp, GlassBorder, RoundedCornerShape(20.dp)),
-        horizontalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // App Logo
         Box(
             modifier = Modifier
                 .padding(top = 16.dp)
@@ -207,10 +202,9 @@ fun GlassSidebar(
             Text("N", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
         }
 
-        // 4 Navigation Items
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             SidebarIcon(
                 label = "MOV",
@@ -286,7 +280,6 @@ fun SidebarIcon(
     }
 }
 
-// --- GLASS SEARCH BAR ---
 @Composable
 fun GlassSearchBar(
     query: String,
@@ -311,7 +304,6 @@ fun GlassSearchBar(
     )
 }
 
-// --- CATALOG GRID ---
 @Composable
 fun CatalogGrid(
     title: String,
@@ -352,7 +344,6 @@ fun CatalogGrid(
     }
 }
 
-// --- GLASS CARD ---
 @Composable
 fun GlassCard(
     item: CatalogItem,
@@ -395,7 +386,6 @@ fun GlassCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Glass gradient caption
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -419,7 +409,6 @@ fun GlassCard(
     }
 }
 
-// --- GLASS DETAILS & PLAYER SELECTION DIALOG ---
 @Composable
 fun DetailsGlassDialog(
     item: CatalogItem,
@@ -459,7 +448,7 @@ fun DetailsGlassDialog(
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                 ) {
-                    Text(if (isSaved) "✓ Saved" else "+ Watchlist", fontSize = 11.sp)
+                    Text(if (isSaved) "✓ Saved" else "+ Watchlist", fontSize = 11.sp, color = Color.White)
                 }
             }
         },
@@ -537,8 +526,6 @@ fun DetailsGlassDialog(
             }
         }
     )
-
-    // Player Selection Chooser
     selectedStreamForAction?.let { stream ->
         AlertDialog(
             onDismissRequest = { selectedStreamForAction = null },
@@ -554,4 +541,107 @@ fun DetailsGlassDialog(
                         onClick = {
                             val url = stream.url
                             selectedStreamForAction = null
-                            onPlayInt
+                            onPlayInternal(url)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Internal Player (Low-RAM)", color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            val url = stream.url
+                            val title = item.title
+                            selectedStreamForAction = null
+                            onPlayExternal(url, title)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("External Player (VLC / MX)", color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedStreamForAction = null }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AddonManagerDialog(
+    addons: List<InstalledAddon>,
+    onDismiss: () -> Unit,
+    onAddUrl: (String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    var inputUrl by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Installed Add-ons", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = Color(0xF0181C24),
+        shape = RoundedCornerShape(16.dp),
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = inputUrl,
+                    onValueChange = { inputUrl = it },
+                    label = { Text("Addon Manifest URL") },
+                    placeholder = { Text("https://.../manifest.json") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                    items(addons) { addon ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(addon.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(addon.transportUrl, color = Color.Gray, fontSize = 10.sp, maxLines = 1)
+                            }
+                            if (addon.id != "cinemeta") {
+                                TextButton(onClick = { onRemove(addon.transportUrl) }) {
+                                    Text("Remove", color = Color.Red, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (inputUrl.isNotBlank()) onAddUrl(inputUrl) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+            ) {
+                Text("Install", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color.LightGray)
+            }
+        }
+    )
+}
