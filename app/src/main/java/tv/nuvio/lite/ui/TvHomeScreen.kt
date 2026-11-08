@@ -26,19 +26,29 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import tv.nuvio.lite.addon.CatalogItem
 import tv.nuvio.lite.addon.InstalledAddon
+import tv.nuvio.lite.addon.StreamLink
 
 @Composable
 fun TvHomeScreen(
     movies: List<CatalogItem>,
     series: List<CatalogItem>,
+    searchResults: List<CatalogItem>,
     installedAddons: List<InstalledAddon>,
+    selectedItem: CatalogItem?,
+    availableStreams: List<StreamLink>,
+    isStreamsLoading: Boolean,
     isLoading: Boolean,
     isLowRam: Boolean,
+    onSearch: (String) -> Unit,
+    onClearSearch: () -> Unit,
     onAddAddon: (String) -> Unit,
     onRemoveAddon: (String) -> Unit,
-    onItemSelected: (CatalogItem) -> Unit
+    onSelectContent: (CatalogItem) -> Unit,
+    onCloseDetails: () -> Unit,
+    onPlayStream: (String) -> Unit
 ) {
     var showAddonDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     if (isLoading) {
         Box(
@@ -57,46 +67,88 @@ fun TvHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF0B0D12)),
-            contentPadding = PaddingValues(top = 28.dp, bottom = 48.dp)
+            contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp)
         ) {
+            // Header: Title, Search Bar & Add-on Manager Button
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        text = "NUVIO LITE",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-
-                    Button(
-                        onClick = { showAddonDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E2430)),
-                        shape = RoundedCornerShape(8.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Addons (${installedAddons.size})", color = Color.White)
+                        Text(
+                            text = "NUVIO LITE",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+
+                        Button(
+                            onClick = { showAddonDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E2430)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Addons (${installedAddons.size})", color = Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            if (it.isBlank()) onClearSearch() else onSearch(it)
+                        },
+                        placeholder = { Text("Search movies, series...", color = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF3B82F6),
+                            unfocusedBorderColor = Color.DarkGray
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            // Search Results Section
+            if (searchQuery.isNotBlank()) {
+                item {
+                    CatalogSection("Search Results", searchResults, isLowRam, onSelectContent)
+                }
+            } else {
+                if (movies.isNotEmpty()) {
+                    item {
+                        CatalogSection("Movies", movies, isLowRam, onSelectContent)
                     }
                 }
-            }
-
-            if (movies.isNotEmpty()) {
-                item {
-                    CatalogSection("Movies", movies, isLowRam, onItemSelected)
-                }
-            }
-
-            if (series.isNotEmpty()) {
-                item {
-                    CatalogSection("Series", series, isLowRam, onItemSelected)
+                if (series.isNotEmpty()) {
+                    item {
+                        CatalogSection("Series", series, isLowRam, onSelectContent)
+                    }
                 }
             }
         }
 
+        // Details & Stream Links Sheet
+        selectedItem?.let { item ->
+            DetailsDialog(
+                item = item,
+                streams = availableStreams,
+                isLoading = isStreamsLoading,
+                onDismiss = onCloseDetails,
+                onPlay = onPlayStream
+            )
+        }
+
+        // Add-on Manager Modal
         if (showAddonDialog) {
             AddonManagerDialog(
                 addons = installedAddons,
@@ -109,6 +161,110 @@ fun TvHomeScreen(
             )
         }
     }
+}
+
+@Composable
+fun DetailsDialog(
+    item: CatalogItem,
+    streams: List<StreamLink>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onPlay: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF161A22),
+        title = {
+            Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = item.posterUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = item.description ?: "No description available.",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        maxLines = 6,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Playable Links",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF3B82F6), modifier = Modifier.size(28.dp))
+                    }
+                } else if (streams.isEmpty()) {
+                    Text(
+                        text = "No direct stream links found from active add-ons.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(streams) { link ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF222834)),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable { onPlay(link.url) }
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = link.title,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Addon: ${link.addonName}",
+                                        color = Color(0xFF60A5FA),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color.LightGray)
+            }
+        }
+    )
 }
 
 @Composable
@@ -132,6 +288,10 @@ fun AddonManagerDialog(
                     label = { Text("Paste Addon Manifest URL") },
                     placeholder = { Text("https://.../manifest.json") },
                     singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
