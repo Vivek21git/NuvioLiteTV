@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,13 +31,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.util.Locale
 
+@OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
-    
 
     private var playerManager: LowRamPlayerManager? = null
 
@@ -182,7 +184,6 @@ class PlayerActivity : ComponentActivity() {
                             )
                         )
                 ) {
-                    // Top Bar: Back, Title, Track Buttons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -207,7 +208,6 @@ class PlayerActivity : ComponentActivity() {
                             )
                         }
 
-                        // Right action buttons: Speed, Audio, Subs
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             PlayerTopChip("${currentSpeed}x") { showSpeedDialog = true }
                             PlayerTopChip("Audio") { showAudioDialog = true }
@@ -215,7 +215,6 @@ class PlayerActivity : ComponentActivity() {
                         }
                     }
 
-                    // Bottom Bar: Progress Scrub Slider + Professional Controls (Matching Image 2)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -266,7 +265,6 @@ class PlayerActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Controls: |<   -10s   Play/Pause   +10s   >|
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
@@ -338,7 +336,6 @@ class PlayerActivity : ComponentActivity() {
                 }
             }
 
-            // Speed Dialog
             if (showSpeedDialog) {
                 SelectionListDialog(
                     title = "Playback Speed",
@@ -353,7 +350,6 @@ class PlayerActivity : ComponentActivity() {
                 )
             }
 
-            // Audio Dialog
             if (showAudioDialog) {
                 val audioTracks = manager.getAudioTracks()
                 TrackSelectionDialog(
@@ -367,7 +363,6 @@ class PlayerActivity : ComponentActivity() {
                 )
             }
 
-            // Subtitle Dialog
             if (showSubtitleDialog) {
                 val subtitleTracks = manager.getSubtitleTracks()
                 TrackSelectionDialog(
@@ -493,6 +488,7 @@ class PlayerActivity : ComponentActivity() {
             dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = Color.Gray) } }
         )
     }
+
     private fun formatTime(ms: Long): String {
         val totalSecs = (ms / 1000).coerceAtLeast(0)
         val hrs = totalSecs / 3600
