@@ -1,5 +1,6 @@
 package tv.nuvio.lite
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import tv.nuvio.lite.addon.AppTheme
 import tv.nuvio.lite.addon.CatalogItem
 import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.StreamLink
@@ -33,6 +35,11 @@ class MainActivity : ComponentActivity() {
         addonManager = StremioAddonManager(this)
         watchlistManager = WatchlistManager(this)
 
+        val themePrefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val initialThemeName = themePrefs.getString("selected_theme", AppTheme.AMOLED_BLACK.name) ?: AppTheme.AMOLED_BLACK.name
+        val initialTheme = try { AppTheme.valueOf(initialThemeName) } catch (_: Exception) { AppTheme.AMOLED_BLACK }
+
+        var currentTheme by mutableStateOf(initialTheme)
         var movies by mutableStateOf(emptyList<CatalogItem>())
         var series by mutableStateOf(emptyList<CatalogItem>())
         var watchlist by mutableStateOf(watchlistManager.getWatchlist())
@@ -73,7 +80,11 @@ class MainActivity : ComponentActivity() {
                 isStreamsLoading = isStreamsLoading,
                 isItemInWatchlist = isItemSaved,
                 isLoading = isLoading,
-                isLowRam = app.isLowRamDevice,
+                currentTheme = currentTheme,
+                onSelectTheme = { newTheme ->
+                    currentTheme = newTheme
+                    themePrefs.edit().putString("selected_theme", newTheme.name).apply()
+                },
                 onToggleWatchlist = { item ->
                     watchlistManager.toggleWatchlist(item)
                     watchlist = watchlistManager.getWatchlist()
