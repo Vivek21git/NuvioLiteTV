@@ -4,15 +4,20 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 
-data class AudioTrackOption(
+data class MediaTrackOption(
     val groupIndex: Int,
     val trackIndex: Int,
     val label: String,
@@ -22,7 +27,9 @@ data class AudioTrackOption(
 @OptIn(UnstableApi::class)
 class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
 
-    private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
+    private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context).apply {
+        setParameters(buildUponParameters().setPreferredTextLanguage("en"))
+    }
     private val player: ExoPlayer
 
     init {
@@ -30,18 +37,40 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(allocator)
             .setBufferDurationsMs(
-                if (isLowRam) 4_000 else 12_000,
-                if (isLowRam) 10_000 else 25_000,
+                if (isLowRam) 5_000 else 15_000,
+                if (isLowRam) 20_000 else 40_000,
                 1_000,
                 2_000
             )
             .setPrioritizeTimeOverSizeThresholds(true)
-            .setTargetBufferBytes(if (isLowRam) 10 * 1024 * 1024 else 30 * 1024 * 1024)
+            .setTargetBufferBytes(if (isLowRam) 14 * 1024 * 1024 else 40 * 1024 * 1024)
             .build()
 
-        player = ExoPlayer.Builder(context)
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(12_000)
+            .setUserAgent("Mozilla/5.0 (Linux; Android TV) AppleWebKit/537.36")
+
+        // HLS seeking extractor fix
+        val hlsExtractorFactory = androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory(
+            /* flags = */ androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
+            /* exposeCea608WhenMissingDeclarations = */ true
+        )
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
+        player = ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
+            // Ensures instantaneous snap to closest keyframe on scrub
+            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .setHandleAudioBecomingNoisy(true)
             .build().apply {
                 playWhenReady = true
             }
@@ -50,37 +79,49 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
     fun getPlayer(): ExoPlayer = player
 
     fun play(url: String) {
-        player.setMediaItem(MediaItem.fromUri(url))
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
+            .build()
+        player.setMediaItem(mediaItem)
         player.prepare()
     }
 
+    // Direct, reliable scrubbing forward/rewind
     fun seekRelative(offsetMs: Long) {
-        val target = (player.currentPosition + offsetMs).coerceIn(0, player.duration.coerceAtLeast(0))
+        val current = player.currentPosition
+        val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+        val target = (current + offsetMs).coerceIn(0L, duration)
         player.seekTo(target)
     }
 
     fun seekTo(positionMs: Long) {
-        player.seekTo(positionMs.coerceIn(0, player.duration.coerceAtLeast(0)))
+        val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+        player.seekTo(positionMs.coerceIn(0L, duration))
     }
 
-    fun getAvailableAudioTracks(): List<AudioTrackOption> {
-        val tracks = player.currentTracks
-        val result = mutableListOf<AudioTrackOption>()
+    fun setSpeed(speed: Float) {
+        player.playbackParameters = PlaybackParameters(speed)
+    }
 
+    fun getAudioTracks(): List<MediaTrackOption> = getTracksForType(C.TRACK_TYPE_AUDIO)
+    fun getSubtitleTracks(): List<MediaTrackOption> = getTracksForType(C.TRACK_TYPE_TEXT)
+
+    private fun getTracksForType(trackType: Int): List<MediaTrackOption> {
+        val tracks = player.currentTracks
+        val result = mutableListOf<MediaTrackOption>()
         for (groupIndex in 0 until tracks.groups.size) {
             val group = tracks.groups[groupIndex]
-            if (group.type == C.TRACK_TYPE_AUDIO) {
+            if (group.type == trackType) {
                 for (trackIndex in 0 until group.length) {
                     val format = group.getTrackFormat(trackIndex)
                     val lang = format.language?.uppercase() ?: "Undetermined"
-                    val label = format.label ?: "$lang (${format.sampleMimeType?.substringAfter('/') ?: "audio"})"
-                    val selected = group.isTrackSelected(trackIndex)
+                    val label = format.label ?: "$lang ${if (trackType == C.TRACK_TYPE_TEXT) "Subtitle" else "Audio"}"
                     result.add(
-                        AudioTrackOption(
+                        MediaTrackOption(
                             groupIndex = groupIndex,
                             trackIndex = trackIndex,
                             label = label,
-                            isSelected = selected
+                            isSelected = group.isTrackSelected(trackIndex)
                         )
                     )
                 }
@@ -89,7 +130,7 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
         return result
     }
 
-    fun selectAudioTrack(option: AudioTrackOption) {
+    fun selectTrack(option: MediaTrackOption) {
         val tracks = player.currentTracks
         if (option.groupIndex < tracks.groups.size) {
             val group = tracks.groups[option.groupIndex].mediaTrackGroup
@@ -101,12 +142,12 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
         }
     }
 
-    fun getVideoQualityInfo(): String {
-        val format = player.videoFormat ?: return "Detecting..."
-        val width = format.width
-        val height = format.height
-        val fps = if (format.frameRate > 0) " @ ${format.frameRate.toInt()}fps" else ""
-        return if (width > 0 && height > 0) "${width}x${height}$fps" else "Standard Stream"
+    fun disableSubtitles() {
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .build()
     }
 
     fun stopAndRelease() {
