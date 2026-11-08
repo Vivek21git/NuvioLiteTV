@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
 
         val themePrefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val initialThemeName = themePrefs.getString("selected_theme", AppTheme.AMOLED_BLACK.name) ?: AppTheme.AMOLED_BLACK.name
-        val initialTheme = try { AppTheme.valueOf(initialThemeName) } catch (_: Exception) { AppTheme.AMOLED_BLACK }
+        val initialTheme = try { AppTheme.valueOf(initialThemeName) } catch (e: Exception) { AppTheme.AMOLED_BLACK }
 
         var currentTheme by mutableStateOf(initialTheme)
         var movies by mutableStateOf(emptyList<CatalogItem>())
@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
 
             val chooser = Intent.createChooser(intent, "Play with...")
             startActivity(chooser)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             Toast.makeText(this, "No external video player found", Toast.LENGTH_SHORT).show()
         }
     }
