@@ -15,20 +15,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -36,7 +35,6 @@ import kotlinx.coroutines.isActive
 class PlayerActivity : ComponentActivity() {
 
     private var playerManager: LowRamPlayerManager? = null
-    private var playerView: PlayerView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +44,7 @@ class PlayerActivity : ComponentActivity() {
             finish()
             return
         }
+        val mediaTitle = intent.getStringExtra("EXTRA_TITLE") ?: "Video Playback"
 
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val isLowRam = am.isLowRamDevice
@@ -56,11 +55,9 @@ class PlayerActivity : ComponentActivity() {
         playerManager = manager
 
         setContent {
-            EnhancedPlayerScreen(
+            ProfessionalPlayerScreen(
+                title = mediaTitle,
                 manager = manager,
-                onSetResizeMode = { mode ->
-                    playerView?.resizeMode = mode
-                },
                 onBack = { finish() }
             )
         }
@@ -74,17 +71,33 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            finish()
-            return true
+        return when (keyCode) {
+            KeyEvent.KEYCODE_BACK -> {
+                finish()
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                playerManager?.seekRelative(-10_000L)
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                playerManager?.seekRelative(10_000L)
+                true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_DPAD_CENTER -> {
+                playerManager?.getPlayer()?.let {
+                    if (it.isPlaying) it.pause() else it.play()
+                }
+                true
+            }
+            else -> super.onKeyDown(keyCode, event)
         }
-        return super.onKeyDown(keyCode, event)
     }
 
     @Composable
-    fun EnhancedPlayerScreen(
+    fun ProfessionalPlayerScreen(
+        title: String,
         manager: LowRamPlayerManager,
-        onSetResizeMode: (Int) -> Unit,
         onBack: () -> Unit
     ) {
         val player = manager.getPlayer()
@@ -96,33 +109,21 @@ class PlayerActivity : ComponentActivity() {
         var dragPosition by remember { mutableFloatStateOf(0f) }
 
         var controlsVisible by remember { mutableStateOf(true) }
-        var showAudioDialog by remember { mutableStateOf(false) }
-        var resizeModeIndex by remember { mutableIntStateOf(0) }
-        val resizeModes = listOf(
-            "FIT" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
-            "ZOOM" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
-            "FILL" to AspectRatioFrameLayout.RESIZE_MODE_FILL
-        )
 
-        var qualityInfo by remember { mutableStateOf("Loading...") }
-
-        // Periodic ticker for progress and media statistics
         LaunchedEffect(Unit) {
             while (isActive) {
                 isPlaying = player.isPlaying
                 if (!isDragging) {
                     currentPos = player.currentPosition
                 }
-                duration = player.duration.coerceAtLeast(0L)
-                qualityInfo = manager.getVideoQualityInfo()
-                delay(500)
+                duration = if (player.duration > 0) player.duration else 0L
+                delay(400)
             }
         }
 
-        // Auto-hide controls timer
         LaunchedEffect(controlsVisible) {
             if (controlsVisible) {
-                delay(4000)
+                delay(4500)
                 controlsVisible = false
             }
         }
@@ -138,23 +139,21 @@ class PlayerActivity : ComponentActivity() {
                     controlsVisible = !controlsVisible
                 }
         ) {
-            // Native Media3 Surface View
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         this.player = player
-                        useController = false // Custom overlay is used
+                        useController = false
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        playerView = this
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // On-Screen HUD Controls
+            // Minimalist Control Overlay (Matching Image 2)
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
@@ -167,123 +166,42 @@ class PlayerActivity : ComponentActivity() {
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.7f),
+                                    Color.Black.copy(alpha = 0.65f),
                                     Color.Transparent,
                                     Color.Black.copy(alpha = 0.85f)
                                 )
                             )
                         )
                 ) {
-                    // Top Bar: Back, Quality Badge, Frame Aspect Ratio, Audio Tracks
+                    // Top Title (Matching Image 2 top left)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(start = 36.dp, top = 28.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Button(
-                                onClick = onBack,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0x66FFFFFF)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text("Back", color = Color.White, fontSize = 12.sp)
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Surface(
-                                color = Color(0x33000000),
-                                shape = RoundedCornerShape(4.dp),
-                                border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f))
-                            ) {
-                                Text(
-                                    text = qualityInfo,
-                                    color = Color.LightGray,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Row {
-                            // Frame Size Toggle
-                            Button(
-                                onClick = {
-                                    resizeModeIndex = (resizeModeIndex + 1) % resizeModes.size
-                                    onSetResizeMode(resizeModes[resizeModeIndex].second)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0x66FFFFFF)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(resizeModes[resizeModeIndex].first, color = Color.White, fontSize = 12.sp)
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Audio Selection Button
-                            Button(
-                                onClick = { showAudioDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text("Audio", color = Color.White, fontSize = 12.sp)
-                            }
-                        }
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
-                    // Center Jump & Play/Pause Controls
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = { manager.seekRelative(-10_000L) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x88222834)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("-10s", fontSize = 14.sp, color = Color.White)
-                        }
-
-                        Button(
-                            onClick = {
-                                if (player.isPlaying) player.pause() else player.play()
-                                isPlaying = player.isPlaying
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.size(width = 90.dp, height = 48.dp)
-                        ) {
-                            Text(if (isPlaying) "Pause" else "Play", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = { manager.seekRelative(10_000L) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x88222834)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("+10s", fontSize = 14.sp, color = Color.White)
-                        }
-                    }
-
-                    // Bottom Bar: Draggable Seek Slider & Time Counters
+                    // Bottom Seekbar & Controls (Matching Image 2)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomCenter)
-                            .padding(horizontal = 24.dp, vertical = 18.dp)
+                            .padding(horizontal = 48.dp, vertical = 32.dp)
                     ) {
-                        val currentFraction = if (duration > 0) {
+                        // Clean White Timeline Slider
+                        val progressFraction = if (duration > 0) {
                             (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                         } else 0f
 
                         Slider(
-                            value = if (isDragging) dragPosition else currentFraction,
+                            value = if (isDragging) dragPosition else progressFraction,
                             onValueChange = {
                                 isDragging = true
                                 dragPosition = it
@@ -295,69 +213,109 @@ class PlayerActivity : ComponentActivity() {
                                 isDragging = false
                             },
                             colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFF3B82F6),
-                                activeTrackColor = Color(0xFF3B82F6),
-                                inactiveTrackColor = Color.DarkGray
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color(0x55FFFFFF)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
 
+                        // Timestamps row: 23:13                               45:20
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(formatTime(if (isDragging) (dragPosition * duration).toLong() else currentPos), color = Color.White, fontSize = 12.sp)
-                            Text(formatTime(duration), color = Color.Gray, fontSize = 12.sp)
+                            Text(
+                                text = formatTime(if (isDragging) (dragPosition * duration).toLong() else currentPos),
+                                color = Color(0xCCFFFFFF),
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = formatTime(duration),
+                                color = Color(0x88FFFFFF),
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Controls: |<   -10s   ||   +10s   >|
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Prev chapter
+                            Text(
+                                text = "|◁",
+                                color = Color(0xAAFFFFFF),
+                                fontSize = 18.sp,
+                                modifier = Modifier
+                                    .clickable { manager.seekTo(0) }
+                                    .padding(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // -10s Jump
+                            Text(
+                                text = "↺ 10",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .clickable { manager.seekRelative(-10_000L) }
+                                    .padding(8.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(20.dp))
+
+                            // Play / Pause Circle
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x33FFFFFF))
+                                    .clickable {
+                                        if (player.isPlaying) player.pause() else player.play()
+                                        isPlaying = player.isPlaying
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isPlaying) "❚❚" else "▶",
+                                    color = Color.White,
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(20.dp))
+
+                            // +10s Jump
+                            Text(
+                                text = "10 ↻",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .clickable { manager.seekRelative(10_000L) }
+                                    .padding(8.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // Next
+                            Text(
+                                text = "▷|",
+                                color = Color(0xAAFFFFFF),
+                                fontSize = 18.sp,
+                                modifier = Modifier
+                                    .clickable { manager.seekTo(duration) }
+                                    .padding(12.dp)
+                            )
                         }
                     }
                 }
-            }
-
-            // Audio Track Selector Modal
-            if (showAudioDialog) {
-                val tracks = manager.getAvailableAudioTracks()
-                AlertDialog(
-                    onDismissRequest = { showAudioDialog = false },
-                    containerColor = Color(0xFF161A22),
-                    title = { Text("Select Audio Track", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-                    text = {
-                        if (tracks.isEmpty()) {
-                            Text("No alternate audio tracks available.", color = Color.Gray, fontSize = 13.sp)
-                        } else {
-                            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                items(tracks) { option ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                manager.selectAudioTrack(option)
-                                                showAudioDialog = false
-                                            }
-                                            .padding(vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = option.label,
-                                            color = if (option.isSelected) Color(0xFF3B82F6) else Color.White,
-                                            fontWeight = if (option.isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 14.sp
-                                        )
-                                        if (option.isSelected) {
-                                            Text("Active", color = Color(0xFF3B82F6), fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    confirmButton = {},
-                    dismissButton = {
-                        TextButton(onClick = { showAudioDialog = false }) {
-                            Text("Close", color = Color.LightGray)
-                        }
-                    }
-                )
             }
         }
     }
