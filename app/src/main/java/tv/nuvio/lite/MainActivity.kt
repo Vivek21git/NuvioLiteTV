@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 isStreamsLoading = isStreamsLoading,
                 isItemInWatchlist = isItemSaved,
                 isLoading = isLoading,
+                isLowRam = app.isLowRamDevice,
                 currentTheme = currentTheme,
                 onSelectTheme = { newTheme ->
                     currentTheme = newTheme
@@ -162,7 +163,7 @@ class MainActivity : ComponentActivity() {
 
             val chooser = Intent.createChooser(intent, "Play with...")
             startActivity(chooser)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, "No external video player found", Toast.LENGTH_SHORT).show()
         }
     }
