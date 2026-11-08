@@ -529,6 +529,7 @@ fun DetailsDialog(
         }
     )
 }
+
 @Composable
 fun AddonManagerDialog(
     addons: List<InstalledAddon>,
