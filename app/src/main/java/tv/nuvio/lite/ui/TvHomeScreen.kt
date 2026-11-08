@@ -69,7 +69,6 @@ fun TvHomeScreen(
             .fillMaxSize()
             .background(MainContentBg)
     ) {
-        // --- 1. DOCKED VERTICAL OTT SIDEBAR (Matching Image 1) ---
         OttSidebar(
             selectedSection = currentSection,
             onSelectSection = { section ->
@@ -80,7 +79,6 @@ fun TvHomeScreen(
             }
         )
 
-        // --- 2. MAIN CATALOG BODY ---
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -90,7 +88,6 @@ fun TvHomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 36.dp)
             ) {
-                // Search field (subtle, expands on type)
                 item {
                     OutlinedTextField(
                         value = searchQuery,
@@ -125,14 +122,12 @@ fun TvHomeScreen(
                         )
                     }
                 } else {
-                    // HERO FEATURED BANNER (Matching Image 1)
                     if (featuredItem != null) {
                         item {
                             FeaturedHeroBanner(item = featuredItem, onPlay = { onSelectContent(featuredItem) })
                         }
                     }
 
-                    // Content Rows
                     when (currentSection) {
                         NavSection.MOVIES -> {
                             item { CatalogRow("Popular", movies, isLowRam, onSelectContent) }
@@ -178,7 +173,6 @@ fun TvHomeScreen(
         }
     }
 
-    // Details Modal
     selectedItem?.let { item ->
         DetailsDialog(
             item = item,
@@ -187,12 +181,11 @@ fun TvHomeScreen(
             isSaved = isItemInWatchlist,
             onToggleWatchlist = { onToggleWatchlist(item) },
             onDismiss = onCloseDetails,
-            onPlayInternal = { url -> onPlayInternal(url, item.title) },
+            onPlayInternal = { streamUrl -> onPlayInternal(streamUrl, item.title) },
             onPlayExternal = onPlayExternal
         )
     }
 
-    // Addons Modal
     if (showAddonDialog) {
         AddonManagerDialog(
             addons = installedAddons,
@@ -206,7 +199,6 @@ fun TvHomeScreen(
     }
 }
 
-// --- DOCKED SIDEBAR (Matching Image 1) ---
 @Composable
 fun OttSidebar(
     selectedSection: NavSection,
@@ -224,7 +216,6 @@ fun OttSidebar(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 16.dp)
         ) {
-            // Gold Film Reel Icon at Top
             Box(
                 modifier = Modifier
                     .size(28.dp)
@@ -237,7 +228,6 @@ fun OttSidebar(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Sidebar navigation icon stack
             SidebarNavItem("🏠", "Home", selectedSection == NavSection.MOVIES) { onSelectSection(NavSection.MOVIES) }
             Spacer(modifier = Modifier.height(18.dp))
             SidebarNavItem("🎬", "Series", selectedSection == NavSection.SERIES) { onSelectSection(NavSection.SERIES) }
@@ -247,7 +237,6 @@ fun OttSidebar(
             SidebarNavItem("🧩", "Addons", selectedSection == NavSection.ADDONS) { onSelectSection(NavSection.ADDONS) }
         }
 
-        // Bottom gear icon
         Box(
             modifier = Modifier
                 .padding(bottom = 20.dp)
@@ -286,7 +275,6 @@ fun SidebarNavItem(
     }
 }
 
-// --- FEATURED HERO BANNER (Matching Image 1) ---
 @Composable
 fun FeaturedHeroBanner(
     item: CatalogItem,
@@ -297,7 +285,6 @@ fun FeaturedHeroBanner(
             .fillMaxWidth()
             .height(280.dp)
     ) {
-        // Backdrop background image with dark left and bottom gradient fade
         AsyncImage(
             model = item.posterUrl,
             contentDescription = null,
@@ -330,7 +317,6 @@ fun FeaturedHeroBanner(
                 )
         )
 
-        // Hero Typography & Rating Badges
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -359,7 +345,6 @@ fun FeaturedHeroBanner(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Metadata row: Film • 2026 • ★ 7.9 • 🍅 94%
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Film  •  2026  •  ", color = Color(0xFFAAAAAA), fontSize = 12.sp)
                 Text("★ 7.9", color = AmberAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -379,7 +364,6 @@ fun FeaturedHeroBanner(
     }
 }
 
-// --- CONTENT ROW & CARD (Matching Image 1) ---
 @Composable
 fun CatalogRow(
     title: String,
@@ -445,7 +429,6 @@ fun OttMovieCard(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Title & Rating Badges
         Text(
             text = item.title,
             color = Color.White,
@@ -464,7 +447,7 @@ fun OttMovieCard(
         }
     }
 }
-// --- DETAILS & STREAMS DIALOG ---
+
 @Composable
 fun DetailsDialog(
     item: CatalogItem,
@@ -552,7 +535,6 @@ fun DetailsDialog(
     )
 }
 
-// --- ADDONS DIALOG ---
 @Composable
 fun AddonManagerDialog(
     addons: List<InstalledAddon>,
