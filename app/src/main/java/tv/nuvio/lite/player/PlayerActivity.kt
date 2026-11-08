@@ -17,7 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.util.Locale
 
 @OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
@@ -317,9 +320,9 @@ class PlayerActivity : ComponentActivity() {
         val mins = (totalSecs % 3600) / 60
         val secs = totalSecs % 60
         return if (hrs > 0) {
-            String.format("%d:%02d:%02d", hrs, mins, secs)
+            String.format(Locale.US, "%d:%02d:%02d", hrs, mins, secs)
         } else {
-            String.format("%02d:%02d", mins, secs)
+            String.format(Locale.US, "%02d:%02d", mins, secs)
         }
     }
 }
