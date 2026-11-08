@@ -1,20 +1,15 @@
 package tv.nuvio.lite.ui
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +21,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,11 +31,9 @@ import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.NavSection
 import tv.nuvio.lite.addon.StreamLink
 
-val GlassSurface = Color(0x24FFFFFF)
-val GlassSurfaceElevated = Color(0x38FFFFFF)
-val GlassBorder = Color(0x40FFFFFF)
-val GlassBorderActive = Color(0xFF60A5FA)
-val BackgroundDeep = Color(0xFF090B10)
+val DarkSidebarBg = Color(0xFF0F0E17)
+val MainContentBg = Color(0xFF0A0910)
+val AmberAccent = Color(0xFFF59E0B)
 
 @Composable
 fun TvHomeScreen(
@@ -61,21 +55,23 @@ fun TvHomeScreen(
     onRemoveAddon: (String) -> Unit,
     onSelectContent: (CatalogItem) -> Unit,
     onCloseDetails: () -> Unit,
-    onPlayInternal: (String) -> Unit,
+    onPlayInternal: (String, String) -> Unit,
     onPlayExternal: (String, String) -> Unit
 ) {
     var currentSection by remember { mutableStateOf(NavSection.MOVIES) }
     var searchQuery by remember { mutableStateOf("") }
     var showAddonDialog by remember { mutableStateOf(false) }
 
+    val featuredItem = remember(movies) { movies.firstOrNull() }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDeep)
+            .background(MainContentBg)
     ) {
-        GlassSidebar(
+        // --- 1. DOCKED VERTICAL OTT SIDEBAR (Matching Image 1) ---
+        OttSidebar(
             selectedSection = currentSection,
-            isLowRam = isLowRam,
             onSelectSection = { section ->
                 currentSection = section
                 if (section == NavSection.ADDONS) {
@@ -84,58 +80,83 @@ fun TvHomeScreen(
             }
         )
 
+        // --- 2. MAIN CATALOG BODY ---
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(end = 16.dp, top = 16.dp, bottom = 16.dp)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                GlassSearchBar(
-                    query = searchQuery,
-                    onQueryChange = {
-                        searchQuery = it
-                        if (it.isBlank()) onClearSearch() else onSearch(it)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 36.dp)
+            ) {
+                // Search field (subtle, expands on type)
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            if (it.isBlank()) onClearSearch() else onSearch(it)
+                        },
+                        placeholder = { Text("Search title, actor or genre...", color = Color.Gray, fontSize = 13.sp) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = AmberAccent,
+                            unfocusedBorderColor = Color(0x33FFFFFF),
+                            focusedContainerColor = Color(0x22000000),
+                            unfocusedContainerColor = Color(0x11000000)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 12.dp)
+                            .height(48.dp)
+                    )
+                }
 
-                if (isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = Color(0xFF3B82F6))
+                if (searchQuery.isNotBlank()) {
+                    item {
+                        CatalogRow(
+                            title = "Search Results",
+                            items = searchResults,
+                            isLowRam = isLowRam,
+                            onSelect = onSelectContent
+                        )
                     }
                 } else {
-                    AnimatedContent(
-                        targetState = Pair(currentSection, searchQuery.isNotBlank()),
-                        transitionSpec = {
-                            fadeIn(spring(stiffness = Spring.StiffnessLow)) + slideInVertically { it / 8 } togetherWith
-                                    fadeOut(spring(stiffness = Spring.StiffnessLow))
-                        },
-                        label = "sectionTransition"
-                    ) { (section, isSearching) ->
-                        if (isSearching) {
-                            CatalogGrid("Search Results", searchResults, isLowRam, onSelectContent)
-                        } else {
-                            when (section) {
-                                NavSection.MOVIES -> CatalogGrid("Featured Movies", movies, isLowRam, onSelectContent)
-                                NavSection.SERIES -> CatalogGrid("Trending Series", series, isLowRam, onSelectContent)
-                                NavSection.WATCHLIST -> CatalogGrid("My Watchlist", watchlist, isLowRam, onSelectContent)
-                                NavSection.ADDONS -> {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
+                    // HERO FEATURED BANNER (Matching Image 1)
+                    if (featuredItem != null) {
+                        item {
+                            FeaturedHeroBanner(item = featuredItem, onPlay = { onSelectContent(featuredItem) })
+                        }
+                    }
+
+                    // Content Rows
+                    when (currentSection) {
+                        NavSection.MOVIES -> {
+                            item { CatalogRow("Popular", movies, isLowRam, onSelectContent) }
+                            item { CatalogRow("Top Rated", movies.reversed(), isLowRam, onSelectContent) }
+                        }
+                        NavSection.SERIES -> {
+                            item { CatalogRow("Trending Series", series, isLowRam, onSelectContent) }
+                        }
+                        NavSection.WATCHLIST -> {
+                            item { CatalogRow("My Watchlist", watchlist, isLowRam, onSelectContent) }
+                        }
+                        NavSection.ADDONS -> {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(48.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Button(
+                                        onClick = { showAddonDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AmberAccent)
                                     ) {
-                                        Button(
-                                            onClick = { showAddonDialog = true },
-                                            colors = ButtonDefaults.buttonColors(containerColor = GlassBorderActive)
-                                        ) {
-                                            Text("Open Add-ons Manager (${installedAddons.size})", color = Color.White)
-                                        }
+                                        Text("Manage Installed Add-ons (${installedAddons.size})", color = Color.Black, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -143,22 +164,35 @@ fun TvHomeScreen(
                     }
                 }
             }
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = AmberAccent)
+                }
+            }
         }
     }
 
+    // Details Modal
     selectedItem?.let { item ->
-        DetailsGlassDialog(
+        DetailsDialog(
             item = item,
             streams = availableStreams,
             isLoading = isStreamsLoading,
             isSaved = isItemInWatchlist,
             onToggleWatchlist = { onToggleWatchlist(item) },
             onDismiss = onCloseDetails,
-            onPlayInternal = onPlayInternal,
+            onPlayInternal = { url -> onPlayInternal(url, item.title) },
             onPlayExternal = onPlayExternal
         )
     }
 
+    // Addons Modal
     if (showAddonDialog) {
         AddonManagerDialog(
             addons = installedAddons,
@@ -172,218 +206,117 @@ fun TvHomeScreen(
     }
 }
 
+// --- DOCKED SIDEBAR (Matching Image 1) ---
 @Composable
-fun GlassSidebar(
+fun OttSidebar(
     selectedSection: NavSection,
-    isLowRam: Boolean,
     onSelectSection: (NavSection) -> Unit
 ) {
-    val sidebarBg = if (isLowRam) Color(0xFF10131A) else Color(0x1AFFFFFF)
-
     Column(
         modifier = Modifier
-            .width(80.dp)
+            .width(58.dp)
             .fillMaxHeight()
-            .padding(12.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(sidebarBg)
-            .border(1.dp, GlassBorder, RoundedCornerShape(20.dp)),
+            .background(DarkSidebarBg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            // Gold Film Reel Icon at Top
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF231F2D)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎞", fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Sidebar navigation icon stack
+            SidebarNavItem("🏠", "Home", selectedSection == NavSection.MOVIES) { onSelectSection(NavSection.MOVIES) }
+            Spacer(modifier = Modifier.height(18.dp))
+            SidebarNavItem("🎬", "Series", selectedSection == NavSection.SERIES) { onSelectSection(NavSection.SERIES) }
+            Spacer(modifier = Modifier.height(18.dp))
+            SidebarNavItem("🔖", "Watchlist", selectedSection == NavSection.WATCHLIST) { onSelectSection(NavSection.WATCHLIST) }
+            Spacer(modifier = Modifier.height(18.dp))
+            SidebarNavItem("🧩", "Addons", selectedSection == NavSection.ADDONS) { onSelectSection(NavSection.ADDONS) }
+        }
+
+        // Bottom gear icon
         Box(
             modifier = Modifier
-                .padding(top = 16.dp)
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8)))),
-            contentAlignment = Alignment.Center
+                .padding(bottom = 20.dp)
+                .clickable { onSelectSection(NavSection.ADDONS) }
         ) {
-            Text("N", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            Text("⚙️", fontSize = 16.sp)
         }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            SidebarIcon(
-                label = "MOV",
-                name = "Movies",
-                isSelected = selectedSection == NavSection.MOVIES,
-                onClick = { onSelectSection(NavSection.MOVIES) }
-            )
-            SidebarIcon(
-                label = "SER",
-                name = "Series",
-                isSelected = selectedSection == NavSection.SERIES,
-                onClick = { onSelectSection(NavSection.SERIES) }
-            )
-            SidebarIcon(
-                label = "WCH",
-                name = "Watchlist",
-                isSelected = selectedSection == NavSection.WATCHLIST,
-                onClick = { onSelectSection(NavSection.WATCHLIST) }
-            )
-            SidebarIcon(
-                label = "ADD",
-                name = "Addons",
-                isSelected = selectedSection == NavSection.ADDONS,
-                onClick = { onSelectSection(NavSection.ADDONS) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
 @Composable
-fun SidebarIcon(
+fun SidebarNavItem(
+    symbol: String,
     label: String,
-    name: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused || isSelected) 1.15f else 1.0f,
-        label = "sidebarScale"
-    )
-
-    val background = when {
-        isSelected -> Color(0xFF3B82F6)
-        isFocused -> GlassSurfaceElevated
-        else -> Color.Transparent
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(12.dp))
-            .background(background)
-            .clickable { onClick() }
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
-            .padding(vertical = 10.dp, horizontal = 8.dp)
-    ) {
-        Text(
-            text = label,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
-            color = if (isSelected || isFocused) Color.White else Color.Gray
-        )
-        Text(
-            text = name,
-            fontSize = 8.sp,
-            color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color.LightGray.copy(alpha = 0.6f)
-        )
-    }
-}
-
-@Composable
-fun GlassSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text("Search movies, TV shows, anime...", color = Color.Gray, fontSize = 14.sp) },
-        singleLine = true,
-        shape = RoundedCornerShape(16.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedContainerColor = GlassSurfaceElevated,
-            unfocusedContainerColor = GlassSurface,
-            focusedBorderColor = GlassBorderActive,
-            unfocusedBorderColor = GlassBorder
-        ),
-        modifier = modifier.height(52.dp)
-    )
-}
-
-@Composable
-fun CatalogGrid(
-    title: String,
-    items: List<CatalogItem>,
-    isLowRam: Boolean,
-    onSelect: (CatalogItem) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = title,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(bottom = 12.dp, start = 4.dp)
-        )
-
-        if (items.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 64.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No content found", color = Color.Gray, fontSize = 14.sp)
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(115.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 40.dp)
-            ) {
-                items(items, key = { it.id }) { item ->
-                    GlassCard(item = item, isLowRam = isLowRam, onSelect = { onSelect(item) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GlassCard(
-    item: CatalogItem,
-    isLowRam: Boolean,
-    onSelect: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.08f else 1.0f,
-        label = "cardScale"
-    )
-
-    val cardBg = if (isLowRam) Color(0xFF161A22) else GlassSurface
-    val borderBrush = if (isFocused) {
-        Brush.verticalGradient(listOf(Color(0xFF60A5FA), Color(0xFF2563EB)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x0DFFFFFF)))
-    }
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(175.dp)
-            .scale(scale)
-            .clip(RoundedCornerShape(12.dp))
-            .background(cardBg)
+            .size(42.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) Color(0x33F59E0B) else if (isFocused) Color(0x22FFFFFF) else Color.Transparent)
             .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                brush = borderBrush,
-                shape = RoundedCornerShape(12.dp)
+                width = if (isSelected) 1.5.dp else 0.dp,
+                color = if (isSelected) AmberAccent else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
             )
-            .clickable { onSelect() }
+            .clickable { onClick() }
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
+            .focusable(),
+        contentAlignment = Alignment.Center
     ) {
+        Text(symbol, fontSize = 18.sp)
+    }
+}
+
+// --- FEATURED HERO BANNER (Matching Image 1) ---
+@Composable
+fun FeaturedHeroBanner(
+    item: CatalogItem,
+    onPlay: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+    ) {
+        // Backdrop background image with dark left and bottom gradient fade
         AsyncImage(
             model = item.posterUrl,
-            contentDescription = item.title,
+            contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 140.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(MainContentBg, MainContentBg.copy(alpha = 0.95f), Color.Transparent),
+                        startX = 0f,
+                        endX = 900f
+                    )
+                )
         )
 
         Box(
@@ -391,26 +324,149 @@ fun GlassCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                        startY = 90f
+                        colors = listOf(Color.Transparent, MainContentBg),
+                        startY = 140f
                     )
-                ),
-            contentAlignment = Alignment.BottomStart
+                )
+        )
+
+        // Hero Typography & Rating Badges
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(480.dp)
+                .padding(start = 32.dp, top = 20.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = item.title,
+                text = "FEATURED",
+                color = AmberAccent,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = item.title,
+                fontFamily = FontFamily.Serif,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
                 color = Color.White,
-                maxLines = 1,
-                modifier = Modifier.padding(8.dp)
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Metadata row: Film • 2026 • ★ 7.9 • 🍅 94%
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Film  •  2026  •  ", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+                Text("★ 7.9", color = AmberAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("  •  🍅 94%", color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = item.description ?: "Embark on an epic journey across mysterious lands.",
+                color = Color(0xFFCCCCCC),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                maxLines = 3
             )
         }
     }
 }
 
+// --- CONTENT ROW & CARD (Matching Image 1) ---
 @Composable
-fun DetailsGlassDialog(
+fun CatalogRow(
+    title: String,
+    items: List<CatalogItem>,
+    isLowRam: Boolean,
+    onSelect: (CatalogItem) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        Text(
+            text = title,
+            fontFamily = FontFamily.Serif,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.padding(start = 32.dp, bottom = 12.dp)
+        )
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 32.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(items, key = { it.id }) { item ->
+                OttMovieCard(item, onSelect = { onSelect(item) })
+            }
+        }
+    }
+}
+
+@Composable
+fun OttMovieCard(
+    item: CatalogItem,
+    onSelect: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (isFocused) 1.06f else 1.0f, label = "cardScale")
+
+    Column(
+        modifier = Modifier
+            .width(135.dp)
+            .scale(scale)
+            .clickable { onSelect() }
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(
+                    width = if (isFocused) 2.dp else 0.dp,
+                    color = if (isFocused) AmberAccent else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+        ) {
+            AsyncImage(
+                model = item.posterUrl,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Title & Rating Badges
+        Text(
+            text = item.title,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("★ 7.5", color = AmberAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("🍅 82%", color = Color(0xFFEF4444), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+// --- DETAILS & STREAMS DIALOG ---
+@Composable
+fun DetailsDialog(
     item: CatalogItem,
     streams: List<StreamLink>,
     isLoading: Boolean,
@@ -420,98 +476,68 @@ fun DetailsGlassDialog(
     onPlayInternal: (String) -> Unit,
     onPlayExternal: (String, String) -> Unit
 ) {
-    var selectedStreamForAction by remember { mutableStateOf<StreamLink?>(null) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xF0131720),
-        shape = RoundedCornerShape(18.dp),
+        containerColor = Color(0xFF161520),
+        shape = RoundedCornerShape(12.dp),
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = item.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f)
-                )
-
+                Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
                 Button(
                     onClick = onToggleWatchlist,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSaved) Color(0xFFEF4444) else Color(0x33FFFFFF)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isSaved) Color(0xFFEF4444) else Color(0x33FFFFFF)),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
-                    Text(if (isSaved) "✓ Saved" else "+ Watchlist", fontSize = 11.sp, color = Color.White)
+                    Text(if (isSaved) "Saved" else "+ Watchlist", fontSize = 11.sp, color = Color.White)
                 }
             }
         },
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    AsyncImage(
-                        model = item.posterUrl,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .width(80.dp)
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = item.description ?: "No description provided.",
-                        color = Color.LightGray,
-                        fontSize = 12.sp,
-                        maxLines = 5,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Playable Streams (${streams.size})",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
-                )
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+                Text(item.description ?: "No overview available.", color = Color.LightGray, fontSize = 12.sp, maxLines = 4)
+                Spacer(modifier = Modifier.height(14.dp))
+                Text("Select Stream Source (${streams.size}):", color = AmberAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (isLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = Color(0xFF3B82F6), modifier = Modifier.size(28.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AmberAccent, modifier = Modifier.size(24.dp))
                     }
                 } else if (streams.isEmpty()) {
-                    Text("No playable streams available.", color = Color.Gray, fontSize = 12.sp)
+                    Text("No direct stream links found.", color = Color.Gray, fontSize = 12.sp)
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(streams) { link ->
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0x24FFFFFF)),
-                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF222030)),
+                                shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clickable { selectedStreamForAction = link }
+                                    .clickable { onPlayInternal(link.url) }
                             ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text(link.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                    Text(link.addonName, color = Color(0xFF60A5FA), fontSize = 10.sp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(link.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Text("Source: ${link.addonName}", color = Color.Gray, fontSize = 10.sp)
+                                    }
+                                    Button(
+                                        onClick = { onPlayExternal(link.url, item.title) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FFFFFF)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text("Ext ↗", fontSize = 10.sp, color = Color.White)
+                                    }
                                 }
                             }
                         }
@@ -521,61 +547,12 @@ fun DetailsGlassDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", color = Color.LightGray)
-            }
+            TextButton(onClick = onDismiss) { Text("Close", color = Color.Gray) }
         }
     )
-    selectedStreamForAction?.let { stream ->
-        AlertDialog(
-            onDismissRequest = { selectedStreamForAction = null },
-            containerColor = Color(0xF21E2430),
-            shape = RoundedCornerShape(16.dp),
-            title = { Text("Play Stream", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(stream.title, color = Color.LightGray, fontSize = 12.sp, maxLines = 2)
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Button(
-                        onClick = {
-                            val url = stream.url
-                            selectedStreamForAction = null
-                            onPlayInternal(url)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Internal Player (Low-RAM)", color = Color.White)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            val url = stream.url
-                            val title = item.title
-                            selectedStreamForAction = null
-                            onPlayExternal(url, title)
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("External Player (VLC / MX)", color = Color.White)
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { selectedStreamForAction = null }) {
-                    Text("Cancel", color = Color.Gray)
-                }
-            }
-        )
-    }
 }
 
+// --- ADDONS DIALOG ---
 @Composable
 fun AddonManagerDialog(
     addons: List<InstalledAddon>,
@@ -588,8 +565,8 @@ fun AddonManagerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Installed Add-ons", color = Color.White, fontWeight = FontWeight.Bold) },
-        containerColor = Color(0xF0181C24),
-        shape = RoundedCornerShape(16.dp),
+        containerColor = Color(0xFF161520),
+        shape = RoundedCornerShape(12.dp),
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
@@ -605,19 +582,17 @@ fun AddonManagerDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                     items(addons) { addon ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(addon.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(addon.name, color = Color.White, fontSize = 13.sp)
                                 Text(addon.transportUrl, color = Color.Gray, fontSize = 10.sp, maxLines = 1)
                             }
                             if (addon.id != "cinemeta") {
@@ -633,15 +608,13 @@ fun AddonManagerDialog(
         confirmButton = {
             Button(
                 onClick = { if (inputUrl.isNotBlank()) onAddUrl(inputUrl) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                colors = ButtonDefaults.buttonColors(containerColor = AmberAccent)
             ) {
-                Text("Install", color = Color.White)
+                Text("Install", color = Color.Black)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", color = Color.LightGray)
-            }
+            TextButton(onClick = onDismiss) { Text("Close", color = Color.LightGray) }
         }
     )
 }
