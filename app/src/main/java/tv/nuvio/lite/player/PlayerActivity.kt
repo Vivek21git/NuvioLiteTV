@@ -16,10 +16,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -114,6 +115,12 @@ class PlayerActivity : ComponentActivity() {
         var dragPosition by remember { mutableFloatStateOf(0f) }
 
         var controlsVisible by remember { mutableStateOf(true) }
+        var showAudioDialog by remember { mutableStateOf(false) }
+        var showSubtitleDialog by remember { mutableStateOf(false) }
+        var showSpeedDialog by remember { mutableStateOf(false) }
+        var currentSpeed by remember { mutableFloatStateOf(1.0f) }
+
+        val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
 
         LaunchedEffect(Unit) {
             while (isActive) {
@@ -122,7 +129,7 @@ class PlayerActivity : ComponentActivity() {
                     currentPos = player.currentPosition
                 }
                 duration = if (player.duration > 0) player.duration else 0L
-                delay(400)
+                delay(350)
             }
         }
 
@@ -170,32 +177,52 @@ class PlayerActivity : ComponentActivity() {
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.7f),
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.85f)
+                                    Color.Black.copy(alpha = 0.9f)
                                 )
                             )
                         )
                 ) {
+                    // Top Bar: Back, Title, Track Buttons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 36.dp, top = 28.dp),
+                            .padding(horizontal = 24.dp, vertical = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = title,
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "←",
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                modifier = Modifier
+                                    .clickable { onBack() }
+                                    .padding(end = 16.dp)
+                            )
+                            Text(
+                                text = title,
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // Right action buttons: Speed, Audio, Subs
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            PlayerTopChip("${currentSpeed}x") { showSpeedDialog = true }
+                            PlayerTopChip("Audio") { showAudioDialog = true }
+                            PlayerTopChip("Subtitles") { showSubtitleDialog = true }
+                        }
                     }
 
+                    // Bottom Bar: Progress Scrub Slider + Professional Controls (Matching Image 2)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomCenter)
-                            .padding(horizontal = 48.dp, vertical = 32.dp)
+                            .padding(horizontal = 40.dp, vertical = 28.dp)
                     ) {
                         val progressFraction = if (duration > 0) {
                             (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
@@ -216,7 +243,7 @@ class PlayerActivity : ComponentActivity() {
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
                                 activeTrackColor = Color.White,
-                                inactiveTrackColor = Color(0x55FFFFFF)
+                                inactiveTrackColor = Color(0x44FFFFFF)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -239,8 +266,9 @@ class PlayerActivity : ComponentActivity() {
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
+                        // Controls: |<   -10s   Play/Pause   +10s   >|
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
@@ -255,22 +283,22 @@ class PlayerActivity : ComponentActivity() {
                                     .padding(12.dp)
                             )
 
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(20.dp))
 
                             Text(
                                 text = "↺ 10",
                                 color = Color.White,
-                                fontSize = 15.sp,
+                                fontSize = 16.sp,
                                 modifier = Modifier
                                     .clickable { manager.seekRelative(-10_000L) }
-                                    .padding(8.dp)
+                                    .padding(10.dp)
                             )
 
-                            Spacer(modifier = Modifier.width(20.dp))
+                            Spacer(modifier = Modifier.width(24.dp))
 
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(50.dp)
                                     .clip(CircleShape)
                                     .background(Color(0x33FFFFFF))
                                     .clickable {
@@ -282,22 +310,22 @@ class PlayerActivity : ComponentActivity() {
                                 Text(
                                     text = if (isPlaying) "❚❚" else "▶",
                                     color = Color.White,
-                                    fontSize = 16.sp
+                                    fontSize = 17.sp
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(20.dp))
+                            Spacer(modifier = Modifier.width(24.dp))
 
                             Text(
                                 text = "10 ↻",
                                 color = Color.White,
-                                fontSize = 15.sp,
+                                fontSize = 16.sp,
                                 modifier = Modifier
                                     .clickable { manager.seekRelative(10_000L) }
-                                    .padding(8.dp)
+                                    .padding(10.dp)
                             )
 
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(20.dp))
 
                             Text(
                                 text = "▷|",
@@ -311,9 +339,162 @@ class PlayerActivity : ComponentActivity() {
                     }
                 }
             }
+
+            // Speed Dialog
+            if (showSpeedDialog) {
+                SelectionListDialog(
+                    title = "Playback Speed",
+                    items = speeds.map { "${it}x" },
+                    selectedIndex = speeds.indexOf(currentSpeed),
+                    onDismiss = { showSpeedDialog = false },
+                    onSelect = { index ->
+                        currentSpeed = speeds[index]
+                        manager.setSpeed(currentSpeed)
+                        showSpeedDialog = false
+                    }
+                )
+            }
+
+            // Audio Dialog
+            if (showAudioDialog) {
+                val audioTracks = manager.getAudioTracks()
+                TrackSelectionDialog(
+                    title = "Audio Tracks",
+                    options = audioTracks,
+                    onDismiss = { showAudioDialog = false },
+                    onSelect = { option ->
+                        manager.selectTrack(option)
+                        showAudioDialog = false
+                    }
+                )
+            }
+
+            // Subtitle Dialog
+            if (showSubtitleDialog) {
+                val subtitleTracks = manager.getSubtitleTracks()
+                TrackSelectionDialog(
+                    title = "Subtitles",
+                    options = subtitleTracks,
+                    allowDisable = true,
+                    onDismiss = { showSubtitleDialog = false },
+                    onSelect = { option ->
+                        if (option != null) manager.selectTrack(option) else manager.disableSubtitles()
+                        showSubtitleDialog = false
+                    }
+                )
+            }
         }
     }
 
+    @Composable
+    fun PlayerTopChip(label: String, onClick: () -> Unit) {
+        Surface(
+            color = Color(0x33FFFFFF),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.clickable { onClick() }
+        ) {
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    }
+
+    @Composable
+    fun TrackSelectionDialog(
+        title: String,
+        options: List<MediaTrackOption>,
+        allowDisable: Boolean = false,
+        onDismiss: () -> Unit,
+        onSelect: (MediaTrackOption?) -> Unit
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = Color(0xFF161520),
+            title = { Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    if (allowDisable) {
+                        item {
+                            Text(
+                                text = "Off (Disabled)",
+                                color = Color.LightGray,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(null) }
+                                    .padding(vertical = 10.dp)
+                            )
+                        }
+                    }
+                    if (options.isEmpty()) {
+                        item {
+                            Text("No tracks available for this stream.", color = Color.Gray, fontSize = 13.sp)
+                        }
+                    } else {
+                        items(options) { opt ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(opt) }
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = opt.label,
+                                    color = if (opt.isSelected) Color(0xFF38BDF8) else Color.White,
+                                    fontSize = 14.sp
+                                )
+                                if (opt.isSelected) Text("✓", color = Color(0xFF38BDF8), fontSize = 14.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = Color.Gray) } }
+        )
+    }
+
+    @Composable
+    fun SelectionListDialog(
+        title: String,
+        items: List<String>,
+        selectedIndex: Int,
+        onDismiss: () -> Unit,
+        onSelect: (Int) -> Unit
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = Color(0xFF161520),
+            title = { Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(items.size) { index ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(index) }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = items[index],
+                                color = if (index == selectedIndex) Color(0xFF38BDF8) else Color.White,
+                                fontSize = 14.sp
+                            )
+                            if (index == selectedIndex) Text("✓", color = Color(0xFF38BDF8), fontSize = 14.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Close", color = Color.Gray) } }
+        )
+    }
     private fun formatTime(ms: Long): String {
         val totalSecs = (ms / 1000).coerceAtLeast(0)
         val hrs = totalSecs / 3600
