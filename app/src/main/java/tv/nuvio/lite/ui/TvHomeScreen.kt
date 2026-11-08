@@ -45,7 +45,8 @@ fun TvHomeScreen(
     onRemoveAddon: (String) -> Unit,
     onSelectContent: (CatalogItem) -> Unit,
     onCloseDetails: () -> Unit,
-    onPlayStream: (String) -> Unit
+    onPlayInternal: (String) -> Unit,
+    onPlayExternal: (String, String) -> Unit
 ) {
     var showAddonDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -69,7 +70,6 @@ fun TvHomeScreen(
                 .background(Color(0xFF0B0D12)),
             contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp)
         ) {
-            // Header: Title, Search Bar & Add-on Manager Button
             item {
                 Column(
                     modifier = Modifier
@@ -118,7 +118,6 @@ fun TvHomeScreen(
                 }
             }
 
-            // Search Results Section
             if (searchQuery.isNotBlank()) {
                 item {
                     CatalogSection("Search Results", searchResults, isLowRam, onSelectContent)
@@ -137,18 +136,17 @@ fun TvHomeScreen(
             }
         }
 
-        // Details & Stream Links Sheet
         selectedItem?.let { item ->
             DetailsDialog(
                 item = item,
                 streams = availableStreams,
                 isLoading = isStreamsLoading,
                 onDismiss = onCloseDetails,
-                onPlay = onPlayStream
+                onPlayInternal = onPlayInternal,
+                onPlayExternal = onPlayExternal
             )
         }
 
-        // Add-on Manager Modal
         if (showAddonDialog) {
             AddonManagerDialog(
                 addons = installedAddons,
@@ -169,8 +167,11 @@ fun DetailsDialog(
     streams: List<StreamLink>,
     isLoading: Boolean,
     onDismiss: () -> Unit,
-    onPlay: (String) -> Unit
+    onPlayInternal: (String) -> Unit,
+    onPlayExternal: (String, String) -> Unit
 ) {
+    var selectedStreamForAction by remember { mutableStateOf<StreamLink?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF161A22),
@@ -205,7 +206,7 @@ fun DetailsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Playable Links",
+                    text = "Streams (${streams.size})",
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp
@@ -223,7 +224,7 @@ fun DetailsDialog(
                     }
                 } else if (streams.isEmpty()) {
                     Text(
-                        text = "No direct stream links found from active add-ons.",
+                        text = "No playable stream links found from active add-ons.",
                         color = Color.Gray,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -237,7 +238,7 @@ fun DetailsDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clickable { onPlay(link.url) }
+                                    .clickable { selectedStreamForAction = link }
                             ) {
                                 Column(modifier = Modifier.padding(10.dp)) {
                                     Text(
@@ -247,7 +248,7 @@ fun DetailsDialog(
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = "Addon: ${link.addonName}",
+                                        text = link.addonName,
                                         color = Color(0xFF60A5FA),
                                         fontSize = 11.sp
                                     )
@@ -265,6 +266,58 @@ fun DetailsDialog(
             }
         }
     )
+
+    // Player Selection Chooser Dialog
+    selectedStreamForAction?.let { stream ->
+        AlertDialog(
+            onDismissRequest = { selectedStreamForAction = null },
+            containerColor = Color(0xFF1E2430),
+            title = {
+                Text("Choose Player", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(stream.title, color = Color.LightGray, fontSize = 12.sp, maxLines = 2)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            val url = stream.url
+                            selectedStreamForAction = null
+                            onPlayInternal(url)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Internal Player (Low-RAM)", color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            val url = stream.url
+                            val title = item.title
+                            selectedStreamForAction = null
+                            onPlayExternal(url, title)
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("External Player (VLC / MX / Just Player)")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedStreamForAction = null }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
 
 @Composable
