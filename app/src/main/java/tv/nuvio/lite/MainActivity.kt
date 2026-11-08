@@ -1,6 +1,7 @@
 package tv.nuvio.lite
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -67,7 +68,7 @@ class MainActivity : ComponentActivity() {
                 onSearch = { query ->
                     searchJob?.cancel()
                     searchJob = lifecycleScope.launch {
-                        delay(400) // Debounce search input
+                        delay(400)
                         searchResults = addonManager.searchCatalog(query)
                     }
                 },
@@ -103,13 +104,41 @@ class MainActivity : ComponentActivity() {
                     selectedItem = null
                     streams = emptyList()
                 },
-                onPlayStream = { streamUrl ->
+                onPlayInternal = { streamUrl ->
                     val intent = Intent(this@MainActivity, PlayerActivity::class.java).apply {
                         putExtra("EXTRA_URL", streamUrl)
                     }
                     startActivity(intent)
+                },
+                onPlayExternal = { streamUrl, title ->
+                    playInExternalPlayer(streamUrl, title)
                 }
             )
+        }
+    }
+
+    private fun playInExternalPlayer(streamUrl: String, title: String) {
+        try {
+            val uri = Uri.parse(streamUrl)
+            val mimeType = if (streamUrl.contains(".m3u8", ignoreCase = true)) {
+                "application/x-mpegURL"
+            } else if (streamUrl.contains(".mpd", ignoreCase = true)) {
+                "application/dash+xml"
+            } else {
+                "video/*"
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                putExtra("title", title)
+                putExtra("video_title", title)
+            }
+
+            val chooser = Intent.createChooser(intent, "Play with...")
+            startActivity(chooser)
+        } catch (e: Exception) {
+            Toast.makeText(this, "No compatible video player found installed", Toast.LENGTH_SHORT).show()
         }
     }
 }
