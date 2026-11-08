@@ -1,12 +1,12 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package tv.nuvio.lite.player
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -23,6 +23,7 @@ data class MediaTrackOption(
     val isSelected: Boolean
 )
 
+@OptIn(UnstableApi::class)
 class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
 
     private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
@@ -103,7 +104,7 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
                 for (trackIndex in 0 until group.length) {
                     val format = group.getTrackFormat(trackIndex)
                     val lang = format.language?.uppercase() ?: "Undetermined"
-                    val label = format.label ?: "$lang${if (trackType == C.TRACK_TYPE_TEXT) "Sub" else "Audio"}"
+                    val label = format.label ?: "$lang ${if (trackType == C.TRACK_TYPE_TEXT) "Sub" else "Audio"}"
                     result.add(
                         MediaTrackOption(
                             groupIndex = groupIndex,
