@@ -7,3 +7,10 @@ data class CatalogItem(
     val type: String,
     val description: String? = null
 )
+
+data class InstalledAddon(
+    val id: String,
+    val name: String,
+    val transportUrl: String,
+    val description: String? = null
+)
