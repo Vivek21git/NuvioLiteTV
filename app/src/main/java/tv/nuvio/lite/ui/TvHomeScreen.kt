@@ -58,20 +58,22 @@ fun TvHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showAddonDialog by remember { mutableStateOf(false) }
 
+    val themeBg = Color(currentTheme.bgHex)
+    val themeSurface = Color(currentTheme.surfaceHex)
+    val themeAccent = Color(currentTheme.accentHex)
+
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(currentTheme.bg)
+            .background(themeBg)
     ) {
-        // DOCKED OTT SIDEBAR
         OttSidebar(
             selectedSection = currentSection,
-            accentColor = currentTheme.accent,
-            sidebarBg = currentTheme.surface,
+            accentColor = themeAccent,
+            sidebarBg = themeSurface,
             onSelectSection = { section -> currentSection = section }
         )
 
-        // MAIN CONTENT
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -81,7 +83,6 @@ fun TvHomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 36.dp)
             ) {
-                // Search bar
                 item {
                     OutlinedTextField(
                         value = searchQuery,
@@ -94,10 +95,10 @@ fun TvHomeScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = currentTheme.accent,
+                            focusedBorderColor = themeAccent,
                             unfocusedBorderColor = Color(0x33FFFFFF),
-                            focusedContainerColor = currentTheme.surface,
-                            unfocusedContainerColor = currentTheme.surface.copy(alpha = 0.6f)
+                            focusedContainerColor = themeSurface,
+                            unfocusedContainerColor = themeSurface.copy(alpha = 0.6f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -108,19 +109,19 @@ fun TvHomeScreen(
 
                 if (searchQuery.isNotBlank()) {
                     item {
-                        CleanCatalogRow("Search Results", searchResults, currentTheme.accent, onSelectContent)
+                        CleanCatalogRow("Search Results", searchResults, themeAccent, onSelectContent)
                     }
                 } else {
                     when (currentSection) {
                         NavSection.MOVIES -> {
-                            item { CleanCatalogRow("Popular Movies", movies, currentTheme.accent, onSelectContent) }
-                            item { CleanCatalogRow("Top Picks", movies.reversed(), currentTheme.accent, onSelectContent) }
+                            item { CleanCatalogRow("Popular Movies", movies, themeAccent, onSelectContent) }
+                            item { CleanCatalogRow("Top Picks", movies.reversed(), themeAccent, onSelectContent) }
                         }
                         NavSection.SERIES -> {
-                            item { CleanCatalogRow("Trending Series", series, currentTheme.accent, onSelectContent) }
+                            item { CleanCatalogRow("Trending Series", series, themeAccent, onSelectContent) }
                         }
                         NavSection.WATCHLIST -> {
-                            item { CleanCatalogRow("My Watchlist", watchlist, currentTheme.accent, onSelectContent) }
+                            item { CleanCatalogRow("My Watchlist", watchlist, themeAccent, onSelectContent) }
                         }
                         NavSection.SETTINGS -> {
                             item {
@@ -143,21 +144,20 @@ fun TvHomeScreen(
                         .background(Color.Black.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = currentTheme.accent)
+                    CircularProgressIndicator(color = themeAccent)
                 }
             }
         }
     }
 
-    // Stream Selection Details Dialog
     selectedItem?.let { item ->
         DetailsDialog(
             item = item,
             streams = availableStreams,
             isLoading = isStreamsLoading,
             isSaved = isItemInWatchlist,
-            accentColor = currentTheme.accent,
-            dialogBg = currentTheme.surface,
+            accentColor = themeAccent,
+            dialogBg = themeSurface,
             onToggleWatchlist = { onToggleWatchlist(item) },
             onDismiss = onCloseDetails,
             onPlayInternal = { streamUrl -> onPlayInternal(streamUrl, item.title) },
@@ -165,12 +165,11 @@ fun TvHomeScreen(
         )
     }
 
-    // Addon Manager Dialog
     if (showAddonDialog) {
         AddonManagerDialog(
             addons = installedAddons,
-            accentColor = currentTheme.accent,
-            dialogBg = currentTheme.surface,
+            accentColor = themeAccent,
+            dialogBg = themeSurface,
             onDismiss = { showAddonDialog = false },
             onAddUrl = { url ->
                 onAddAddon(url)
@@ -199,12 +198,15 @@ fun SettingsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             AppTheme.values().forEach { theme ->
                 val isSelected = theme == currentTheme
+                val surface = Color(theme.surfaceHex)
+                val accent = Color(theme.accentHex)
+
                 Surface(
-                    color = theme.surface,
+                    color = surface,
                     shape = RoundedCornerShape(8.dp),
                     border = androidx.compose.foundation.BorderStroke(
                         width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) theme.accent else Color(0x33FFFFFF)
+                        color = if (isSelected) accent else Color(0x33FFFFFF)
                     ),
                     modifier = Modifier
                         .clickable { onSelectTheme(theme) }
@@ -212,7 +214,7 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(theme.displayName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text(if (isSelected) "Active" else "Select", color = if (isSelected) theme.accent else Color.Gray, fontSize = 11.sp)
+                        Text(if (isSelected) "Active" else "Select", color = if (isSelected) accent else Color.Gray, fontSize = 11.sp)
                     }
                 }
             }
@@ -225,7 +227,7 @@ fun SettingsScreen(
 
         Button(
             onClick = onManageAddons,
-            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.surface),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(currentTheme.surfaceHex)),
             shape = RoundedCornerShape(8.dp)
         ) {
             Text("Manage Installed Add-ons (${installedAddons.size})", color = Color.White)
