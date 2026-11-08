@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -25,14 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import tv.nuvio.lite.addon.AppTheme
 import tv.nuvio.lite.addon.CatalogItem
 import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.NavSection
 import tv.nuvio.lite.addon.StreamLink
-
-val DarkSidebarBg = Color(0xFF0F0E17)
-val MainContentBg = Color(0xFF0A0910)
-val AmberAccent = Color(0xFFF59E0B)
 
 @Composable
 fun TvHomeScreen(
@@ -46,7 +42,8 @@ fun TvHomeScreen(
     isStreamsLoading: Boolean,
     isItemInWatchlist: Boolean,
     isLoading: Boolean,
-    isLowRam: Boolean,
+    currentTheme: AppTheme,
+    onSelectTheme: (AppTheme) -> Unit,
     onToggleWatchlist: (CatalogItem) -> Unit,
     onSearch: (String) -> Unit,
     onClearSearch: () -> Unit,
@@ -61,23 +58,20 @@ fun TvHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showAddonDialog by remember { mutableStateOf(false) }
 
-    val featuredItem = remember(movies) { movies.firstOrNull() }
-
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(MainContentBg)
+            .background(currentTheme.bg)
     ) {
+        // DOCKED OTT SIDEBAR
         OttSidebar(
             selectedSection = currentSection,
-            onSelectSection = { section ->
-                currentSection = section
-                if (section == NavSection.ADDONS) {
-                    showAddonDialog = true
-                }
-            }
+            accentColor = currentTheme.accent,
+            sidebarBg = currentTheme.surface,
+            onSelectSection = { section -> currentSection = section }
         )
 
+        // MAIN CONTENT
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -85,8 +79,9 @@ fun TvHomeScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 36.dp)
+                contentPadding = PaddingValues(top = 16.dp, bottom = 36.dp)
             ) {
+                // Search bar
                 item {
                     OutlinedTextField(
                         value = searchQuery,
@@ -94,64 +89,47 @@ fun TvHomeScreen(
                             searchQuery = it
                             if (it.isBlank()) onClearSearch() else onSearch(it)
                         },
-                        placeholder = { Text("Search title, actor or genre...", color = Color.Gray, fontSize = 13.sp) },
+                        placeholder = { Text("Search movies, series...", color = Color.Gray, fontSize = 13.sp) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = AmberAccent,
+                            focusedBorderColor = currentTheme.accent,
                             unfocusedBorderColor = Color(0x33FFFFFF),
-                            focusedContainerColor = Color(0x22000000),
-                            unfocusedContainerColor = Color(0x11000000)
+                            focusedContainerColor = currentTheme.surface,
+                            unfocusedContainerColor = currentTheme.surface.copy(alpha = 0.6f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 32.dp, vertical = 12.dp)
+                            .padding(horizontal = 28.dp, vertical = 8.dp)
                             .height(48.dp)
                     )
                 }
 
                 if (searchQuery.isNotBlank()) {
                     item {
-                        CatalogRow(
-                            title = "Search Results",
-                            items = searchResults,
-                            onSelect = onSelectContent
-                        )
+                        CleanCatalogRow("Search Results", searchResults, currentTheme.accent, onSelectContent)
                     }
                 } else {
-                    if (featuredItem != null) {
-                        item {
-                            FeaturedHeroBanner(item = featuredItem)
-                        }
-                    }
-
                     when (currentSection) {
                         NavSection.MOVIES -> {
-                            item { CatalogRow("Popular", movies, onSelectContent) }
-                            item { CatalogRow("Top Rated", movies.reversed(), onSelectContent) }
+                            item { CleanCatalogRow("Popular Movies", movies, currentTheme.accent, onSelectContent) }
+                            item { CleanCatalogRow("Top Picks", movies.reversed(), currentTheme.accent, onSelectContent) }
                         }
                         NavSection.SERIES -> {
-                            item { CatalogRow("Trending Series", series, onSelectContent) }
+                            item { CleanCatalogRow("Trending Series", series, currentTheme.accent, onSelectContent) }
                         }
                         NavSection.WATCHLIST -> {
-                            item { CatalogRow("My Watchlist", watchlist, onSelectContent) }
+                            item { CleanCatalogRow("My Watchlist", watchlist, currentTheme.accent, onSelectContent) }
                         }
-                        NavSection.ADDONS -> {
+                        NavSection.SETTINGS -> {
                             item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(48.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Button(
-                                        onClick = { showAddonDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = AmberAccent)
-                                    ) {
-                                        Text("Manage Installed Add-ons (${installedAddons.size})", color = Color.Black, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                                SettingsScreen(
+                                    currentTheme = currentTheme,
+                                    installedAddons = installedAddons,
+                                    onSelectTheme = onSelectTheme,
+                                    onManageAddons = { showAddonDialog = true }
+                                )
                             }
                         }
                     }
@@ -165,18 +143,21 @@ fun TvHomeScreen(
                         .background(Color.Black.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = AmberAccent)
+                    CircularProgressIndicator(color = currentTheme.accent)
                 }
             }
         }
     }
 
+    // Stream Selection Details Dialog
     selectedItem?.let { item ->
         DetailsDialog(
             item = item,
             streams = availableStreams,
             isLoading = isStreamsLoading,
             isSaved = isItemInWatchlist,
+            accentColor = currentTheme.accent,
+            dialogBg = currentTheme.surface,
             onToggleWatchlist = { onToggleWatchlist(item) },
             onDismiss = onCloseDetails,
             onPlayInternal = { streamUrl -> onPlayInternal(streamUrl, item.title) },
@@ -184,9 +165,12 @@ fun TvHomeScreen(
         )
     }
 
+    // Addon Manager Dialog
     if (showAddonDialog) {
         AddonManagerDialog(
             addons = installedAddons,
+            accentColor = currentTheme.accent,
+            dialogBg = currentTheme.surface,
             onDismiss = { showAddonDialog = false },
             onAddUrl = { url ->
                 onAddAddon(url)
@@ -198,15 +182,69 @@ fun TvHomeScreen(
 }
 
 @Composable
+fun SettingsScreen(
+    currentTheme: AppTheme,
+    installedAddons: List<InstalledAddon>,
+    onSelectTheme: (AppTheme) -> Unit,
+    onManageAddons: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 12.dp)
+    ) {
+        Text("Appearance & Themes", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            AppTheme.values().forEach { theme ->
+                val isSelected = theme == currentTheme
+                Surface(
+                    color = theme.surface,
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) theme.accent else Color(0x33FFFFFF)
+                    ),
+                    modifier = Modifier
+                        .clickable { onSelectTheme(theme) }
+                        .padding(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(theme.displayName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(if (isSelected) "Active" else "Select", color = if (isSelected) theme.accent else Color.Gray, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text("Add-ons & Catalogs", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onManageAddons,
+            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.surface),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("Manage Installed Add-ons (${installedAddons.size})", color = Color.White)
+        }
+    }
+}
+
+@Composable
 fun OttSidebar(
     selectedSection: NavSection,
+    accentColor: Color,
+    sidebarBg: Color,
     onSelectSection: (NavSection) -> Unit
 ) {
     Column(
         modifier = Modifier
             .width(58.dp)
             .fillMaxHeight()
-            .background(DarkSidebarBg),
+            .background(sidebarBg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -218,7 +256,7 @@ fun OttSidebar(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF231F2D)),
+                    .background(Color(0x33FFFFFF)),
                 contentAlignment = Alignment.Center
             ) {
                 Text("🎞", fontSize = 16.sp)
@@ -226,22 +264,16 @@ fun OttSidebar(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SidebarNavItem("🏠", selectedSection == NavSection.MOVIES) { onSelectSection(NavSection.MOVIES) }
+            SidebarNavItem("🏠", selectedSection == NavSection.MOVIES, accentColor) { onSelectSection(NavSection.MOVIES) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🎬", selectedSection == NavSection.SERIES) { onSelectSection(NavSection.SERIES) }
+            SidebarNavItem("🎬", selectedSection == NavSection.SERIES, accentColor) { onSelectSection(NavSection.SERIES) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🔖", selectedSection == NavSection.WATCHLIST) { onSelectSection(NavSection.WATCHLIST) }
+            SidebarNavItem("🔖", selectedSection == NavSection.WATCHLIST, accentColor) { onSelectSection(NavSection.WATCHLIST) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🧩", selectedSection == NavSection.ADDONS) { onSelectSection(NavSection.ADDONS) }
+            SidebarNavItem("⚙️", selectedSection == NavSection.SETTINGS, accentColor) { onSelectSection(NavSection.SETTINGS) }
         }
 
-        Box(
-            modifier = Modifier
-                .padding(bottom = 20.dp)
-                .clickable { onSelectSection(NavSection.ADDONS) }
-        ) {
-            Text("⚙️", fontSize = 16.sp)
-        }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -249,6 +281,7 @@ fun OttSidebar(
 fun SidebarNavItem(
     symbol: String,
     isSelected: Boolean,
+    accentColor: Color,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -257,10 +290,10 @@ fun SidebarNavItem(
         modifier = Modifier
             .size(42.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) Color(0x33F59E0B) else if (isFocused) Color(0x22FFFFFF) else Color.Transparent)
+            .background(if (isSelected) accentColor.copy(alpha = 0.2f) else if (isFocused) Color(0x22FFFFFF) else Color.Transparent)
             .border(
                 width = if (isSelected) 1.5.dp else 0.dp,
-                color = if (isSelected) AmberAccent else Color.Transparent,
+                color = if (isSelected) accentColor else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable { onClick() }
@@ -273,123 +306,37 @@ fun SidebarNavItem(
 }
 
 @Composable
-fun FeaturedHeroBanner(
-    item: CatalogItem
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp)
-    ) {
-        AsyncImage(
-            model = item.posterUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 140.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(MainContentBg, MainContentBg.copy(alpha = 0.95f), Color.Transparent),
-                        startX = 0f,
-                        endX = 900f
-                    )
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, MainContentBg),
-                        startY = 140f
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(480.dp)
-                .padding(start = 32.dp, top = 20.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "FEATURED",
-                color = AmberAccent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = item.title,
-                fontFamily = FontFamily.Serif,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Film  •  2026  •  ", color = Color(0xFFAAAAAA), fontSize = 12.sp)
-                Text("★ 7.9", color = AmberAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text("  •  🍅 94%", color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = item.description ?: "Embark on an epic journey across mysterious lands.",
-                color = Color(0xFFCCCCCC),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                maxLines = 3
-            )
-        }
-    }
-}
-
-@Composable
-fun CatalogRow(
+fun CleanCatalogRow(
     title: String,
     items: List<CatalogItem>,
+    accentColor: Color,
     onSelect: (CatalogItem) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
         Text(
             text = title,
             fontFamily = FontFamily.Serif,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            modifier = Modifier.padding(start = 32.dp, bottom = 12.dp)
+            modifier = Modifier.padding(start = 28.dp, bottom = 12.dp)
         )
 
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 32.dp),
+            contentPadding = PaddingValues(horizontal = 28.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(items, key = { it.id }) { item ->
-                OttMovieCard(item, onSelect = { onSelect(item) })
+                CleanMovieCard(item, accentColor, onSelect = { onSelect(item) })
             }
         }
     }
 }
 
 @Composable
-fun OttMovieCard(
+fun CleanMovieCard(
     item: CatalogItem,
+    accentColor: Color,
     onSelect: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -410,7 +357,7 @@ fun OttMovieCard(
                 .clip(RoundedCornerShape(8.dp))
                 .border(
                     width = if (isFocused) 2.dp else 0.dp,
-                    color = if (isFocused) AmberAccent else Color.Transparent,
+                    color = if (isFocused) accentColor else Color.Transparent,
                     shape = RoundedCornerShape(8.dp)
                 )
         ) {
@@ -431,15 +378,6 @@ fun OttMovieCard(
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("★ 7.5", color = AmberAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text("🍅 82%", color = Color(0xFFEF4444), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
     }
 }
 
@@ -449,6 +387,8 @@ fun DetailsDialog(
     streams: List<StreamLink>,
     isLoading: Boolean,
     isSaved: Boolean,
+    accentColor: Color,
+    dialogBg: Color,
     onToggleWatchlist: () -> Unit,
     onDismiss: () -> Unit,
     onPlayInternal: (String) -> Unit,
@@ -456,7 +396,7 @@ fun DetailsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF161520),
+        containerColor = dialogBg,
         shape = RoundedCornerShape(12.dp),
         title = {
             Row(
@@ -479,12 +419,12 @@ fun DetailsDialog(
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
                 Text(item.description ?: "No overview available.", color = Color.LightGray, fontSize = 12.sp, maxLines = 4)
                 Spacer(modifier = Modifier.height(14.dp))
-                Text("Select Stream Source (${streams.size}):", color = AmberAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Select Stream Source (${streams.size}):", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AmberAccent, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
                     }
                 } else if (streams.isEmpty()) {
                     Text("No direct stream links found.", color = Color.Gray, fontSize = 12.sp)
@@ -492,7 +432,7 @@ fun DetailsDialog(
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(streams) { link ->
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF222030)),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x22FFFFFF)),
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -529,10 +469,11 @@ fun DetailsDialog(
         }
     )
 }
-
 @Composable
 fun AddonManagerDialog(
     addons: List<InstalledAddon>,
+    accentColor: Color,
+    dialogBg: Color,
     onDismiss: () -> Unit,
     onAddUrl: (String) -> Unit,
     onRemove: (String) -> Unit
@@ -542,7 +483,7 @@ fun AddonManagerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Installed Add-ons", color = Color.White, fontWeight = FontWeight.Bold) },
-        containerColor = Color(0xFF161520),
+        containerColor = dialogBg,
         shape = RoundedCornerShape(12.dp),
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -585,9 +526,9 @@ fun AddonManagerDialog(
         confirmButton = {
             Button(
                 onClick = { if (inputUrl.isNotBlank()) onAddUrl(inputUrl) },
-                colors = ButtonDefaults.buttonColors(containerColor = AmberAccent)
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
             ) {
-                Text("Install", color = Color.Black)
+                Text("Install", color = Color.White)
             }
         },
         dismissButton = {
