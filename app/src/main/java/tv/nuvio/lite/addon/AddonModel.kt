@@ -20,3 +20,10 @@ data class StreamLink(
     val title: String,
     val url: String
 )
+
+enum class NavSection(val title: String) {
+    MOVIES("Movies"),
+    SERIES("Series"),
+    WATCHLIST("Watchlist"),
+    ADDONS("Add-ons")
+}
