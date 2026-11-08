@@ -1,6 +1,7 @@
 package tv.nuvio.lite.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,14 @@ import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.NavSection
 import tv.nuvio.lite.addon.StreamLink
 
+fun getThemeColors(theme: AppTheme): Triple<Color, Color, Color> {
+    return when (theme) {
+        AppTheme.AMOLED_BLACK -> Triple(Color(0xFF000000), Color(0xFF141414), Color(0xFFE50914))
+        AppTheme.COSMIC_PURPLE -> Triple(Color(0xFF0D0814), Color(0xFF191224), Color(0xFFA855F7))
+        AppTheme.SPACE_BLUE -> Triple(Color(0xFF070B14), Color(0xFF0F1826), Color(0xFF38BDF8))
+    }
+}
+
 @Composable
 fun TvHomeScreen(
     movies: List<CatalogItem>,
@@ -42,6 +51,7 @@ fun TvHomeScreen(
     isStreamsLoading: Boolean,
     isItemInWatchlist: Boolean,
     isLoading: Boolean,
+    isLowRam: Boolean,
     currentTheme: AppTheme,
     onSelectTheme: (AppTheme) -> Unit,
     onToggleWatchlist: (CatalogItem) -> Unit,
@@ -58,9 +68,7 @@ fun TvHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showAddonDialog by remember { mutableStateOf(false) }
 
-    val themeBg = Color(currentTheme.bgHex)
-    val themeSurface = Color(currentTheme.surfaceHex)
-    val themeAccent = Color(currentTheme.accentHex)
+    val (themeBg, themeSurface, themeAccent) = getThemeColors(currentTheme)
 
     Row(
         modifier = Modifier
@@ -187,24 +195,27 @@ fun SettingsScreen(
     onSelectTheme: (AppTheme) -> Unit,
     onManageAddons: () -> Unit
 ) {
+    val themeList = remember {
+        listOf(AppTheme.AMOLED_BLACK, AppTheme.COSMIC_PURPLE, AppTheme.SPACE_BLUE)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 12.dp)
     ) {
         Text("Appearance & Themes", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            AppTheme.values().forEach { theme ->
+            themeList.forEach { theme ->
                 val isSelected = theme == currentTheme
-                val surface = Color(theme.surfaceHex)
-                val accent = Color(theme.accentHex)
+                val (_, surface, accent) = getThemeColors(theme)
 
                 Surface(
                     color = surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = androidx.compose.foundation.BorderStroke(
+                    border = BorderStroke(
                         width = if (isSelected) 2.dp else 1.dp,
                         color = if (isSelected) accent else Color(0x33FFFFFF)
                     ),
@@ -214,6 +225,7 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(theme.displayName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(if (isSelected) "Active" else "Select", color = if (isSelected) accent else Color.Gray, fontSize = 11.sp)
                     }
                 }
@@ -225,9 +237,10 @@ fun SettingsScreen(
         Text("Add-ons & Catalogs", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(12.dp))
 
+        val (_, currentSurface, _) = getThemeColors(currentTheme)
         Button(
             onClick = onManageAddons,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(currentTheme.surfaceHex)),
+            colors = ButtonDefaults.buttonColors(containerColor = currentSurface),
             shape = RoundedCornerShape(8.dp)
         ) {
             Text("Manage Installed Add-ons (${installedAddons.size})", color = Color.White)
