@@ -23,7 +23,7 @@ class LowRamApp : Application(), ImageLoaderFactory {
                 add(BitmapFactoryDecoder.Factory())
             }
             .memoryCache {
-                MemoryCache.Builder(this)
+                MemoryCache.Builder(this@LowRamApp)
                     .maxSizePercent(if (isLowRamDevice) 0.10 else 0.25)
                     .build()
             }
