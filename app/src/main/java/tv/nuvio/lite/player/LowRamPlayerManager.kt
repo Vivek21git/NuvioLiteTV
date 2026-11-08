@@ -1,18 +1,17 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package tv.nuvio.lite.player
 
 import android.content.Context
-import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultAllocator
@@ -24,12 +23,9 @@ data class MediaTrackOption(
     val isSelected: Boolean
 )
 
-@OptIn(UnstableApi::class)
 class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
 
-    private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context).apply {
-        setParameters(buildUponParameters().setPreferredTextLanguage("en"))
-    }
+    private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
     private val player: ExoPlayer
 
     init {
@@ -50,13 +46,7 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(10_000)
             .setReadTimeoutMs(12_000)
-            .setUserAgent("Mozilla/5.0 (Linux; Android TV) AppleWebKit/537.36")
-
-        // HLS seeking extractor fix
-        val hlsExtractorFactory = androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory(
-            /* flags = */ androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
-            /* exposeCea608WhenMissingDeclarations = */ true
-        )
+            .setUserAgent("Mozilla/5.0 (Linux; Android TV) NuvioLiteTV")
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
@@ -68,7 +58,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
             .setMediaSourceFactory(mediaSourceFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            // Ensures instantaneous snap to closest keyframe on scrub
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
             .setHandleAudioBecomingNoisy(true)
             .build().apply {
@@ -86,7 +75,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
         player.prepare()
     }
 
-    // Direct, reliable scrubbing forward/rewind
     fun seekRelative(offsetMs: Long) {
         val current = player.currentPosition
         val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
@@ -115,7 +103,7 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
                 for (trackIndex in 0 until group.length) {
                     val format = group.getTrackFormat(trackIndex)
                     val lang = format.language?.uppercase() ?: "Undetermined"
-                    val label = format.label ?: "$lang ${if (trackType == C.TRACK_TYPE_TEXT) "Subtitle" else "Audio"}"
+                    val label = format.label ?: "$lang${if (trackType == C.TRACK_TYPE_TEXT) "Sub" else "Audio"}"
                     result.add(
                         MediaTrackOption(
                             groupIndex = groupIndex,
@@ -145,7 +133,6 @@ class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
     fun disableSubtitles() {
         player.trackSelectionParameters = player.trackSelectionParameters
             .buildUpon()
-            .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
             .build()
     }
