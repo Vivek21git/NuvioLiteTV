@@ -117,9 +117,10 @@ class MainActivity : ComponentActivity() {
                     selectedItem = null
                     streams = emptyList()
                 },
-                onPlayInternal = { streamUrl ->
+                onPlayInternal = { streamUrl, title ->
                     val intent = Intent(this@MainActivity, PlayerActivity::class.java).apply {
                         putExtra("EXTRA_URL", streamUrl)
+                        putExtra("EXTRA_TITLE", title)
                     }
                     startActivity(intent)
                 },
