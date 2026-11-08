@@ -4,6 +4,9 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -20,9 +23,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val app = application as LowRamApp
-        var movies by androidx.compose.runtime.mutableStateOf(emptyList<CatalogItem>())
-        var series by androidx.compose.runtime.mutableStateOf(emptyList<CatalogItem>())
-        var isLoading by androidx.compose.runtime.mutableStateOf(true)
+        var movies by mutableStateOf(emptyList<CatalogItem>())
+        var series by mutableStateOf(emptyList<CatalogItem>())
+        var isLoading by mutableStateOf(true)
 
         lifecycleScope.launch {
             val moviesDeferred = async { addonManager.getCatalog("movie") }
