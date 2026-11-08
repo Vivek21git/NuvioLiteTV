@@ -16,12 +16,14 @@ import tv.nuvio.lite.addon.CatalogItem
 import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.StreamLink
 import tv.nuvio.lite.addon.StremioAddonManager
+import tv.nuvio.lite.addon.WatchlistManager
 import tv.nuvio.lite.player.PlayerActivity
 import tv.nuvio.lite.ui.TvHomeScreen
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var addonManager: StremioAddonManager
+    private lateinit var watchlistManager: WatchlistManager
     private var searchJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,9 +31,11 @@ class MainActivity : ComponentActivity() {
 
         val app = application as LowRamApp
         addonManager = StremioAddonManager(this)
+        watchlistManager = WatchlistManager(this)
 
         var movies by mutableStateOf(emptyList<CatalogItem>())
         var series by mutableStateOf(emptyList<CatalogItem>())
+        var watchlist by mutableStateOf(watchlistManager.getWatchlist())
         var searchResults by mutableStateOf(emptyList<CatalogItem>())
         var addons by mutableStateOf(emptyList<InstalledAddon>())
         var selectedItem by mutableStateOf<CatalogItem?>(null)
@@ -42,6 +46,7 @@ class MainActivity : ComponentActivity() {
         fun loadCatalogs() {
             isLoading = true
             addons = addonManager.getInstalledAddons()
+            watchlist = watchlistManager.getWatchlist()
             lifecycleScope.launch {
                 val moviesDeferred = async { addonManager.getCatalog("movie") }
                 val seriesDeferred = async { addonManager.getCatalog("series") }
@@ -55,16 +60,24 @@ class MainActivity : ComponentActivity() {
         loadCatalogs()
 
         setContent {
+            val isItemSaved = selectedItem?.let { watchlistManager.isInWatchlist(it.id) } ?: false
+
             TvHomeScreen(
                 movies = movies,
                 series = series,
+                watchlist = watchlist,
                 searchResults = searchResults,
                 installedAddons = addons,
                 selectedItem = selectedItem,
                 availableStreams = streams,
                 isStreamsLoading = isStreamsLoading,
+                isItemInWatchlist = isItemSaved,
                 isLoading = isLoading,
                 isLowRam = app.isLowRamDevice,
+                onToggleWatchlist = { item ->
+                    watchlistManager.toggleWatchlist(item)
+                    watchlist = watchlistManager.getWatchlist()
+                },
                 onSearch = { query ->
                     searchJob?.cancel()
                     searchJob = lifecycleScope.launch {
@@ -80,10 +93,10 @@ class MainActivity : ComponentActivity() {
                     lifecycleScope.launch {
                         val success = addonManager.addAddonByUrl(url)
                         if (success) {
-                            Toast.makeText(this@MainActivity, "Addon installed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Add-on installed", Toast.LENGTH_SHORT).show()
                             loadCatalogs()
                         } else {
-                            Toast.makeText(this@MainActivity, "Invalid addon manifest", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "Failed to load manifest", Toast.LENGTH_LONG).show()
                         }
                     }
                 },
@@ -138,7 +151,7 @@ class MainActivity : ComponentActivity() {
             val chooser = Intent.createChooser(intent, "Play with...")
             startActivity(chooser)
         } catch (e: Exception) {
-            Toast.makeText(this, "No compatible video player found installed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "No external video player found", Toast.LENGTH_SHORT).show()
         }
     }
 }
