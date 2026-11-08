@@ -31,7 +31,7 @@ import tv.nuvio.lite.addon.InstalledAddon
 import tv.nuvio.lite.addon.NavSection
 import tv.nuvio.lite.addon.StreamLink
 
-fun getThemeColors(theme: AppTheme): Triple<Color, Color, Color> {
+fun getThemePalette(theme: AppTheme): Triple<Color, Color, Color> {
     return when (theme) {
         AppTheme.AMOLED_BLACK -> Triple(Color(0xFF000000), Color(0xFF141414), Color(0xFFE50914))
         AppTheme.COSMIC_PURPLE -> Triple(Color(0xFF0D0814), Color(0xFF191224), Color(0xFFA855F7))
@@ -68,7 +68,7 @@ fun TvHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showAddonDialog by remember { mutableStateOf(false) }
 
-    val (themeBg, themeSurface, themeAccent) = getThemeColors(currentTheme)
+    val (themeBg, themeSurface, themeAccent) = getThemePalette(currentTheme)
 
     Row(
         modifier = Modifier
@@ -210,7 +210,7 @@ fun SettingsScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             themeList.forEach { theme ->
                 val isSelected = theme == currentTheme
-                val (_, surface, accent) = getThemeColors(theme)
+                val (_, surface, accent) = getThemePalette(theme)
 
                 Surface(
                     color = surface,
@@ -237,7 +237,7 @@ fun SettingsScreen(
         Text("Add-ons & Catalogs", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(12.dp))
 
-        val (_, currentSurface, _) = getThemeColors(currentTheme)
+        val (_, currentSurface, _) = getThemePalette(currentTheme)
         Button(
             onClick = onManageAddons,
             colors = ButtonDefaults.buttonColors(containerColor = currentSurface),
