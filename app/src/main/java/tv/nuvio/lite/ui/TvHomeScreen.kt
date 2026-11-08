@@ -1,6 +1,5 @@
 package tv.nuvio.lite.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -117,27 +116,26 @@ fun TvHomeScreen(
                         CatalogRow(
                             title = "Search Results",
                             items = searchResults,
-                            isLowRam = isLowRam,
                             onSelect = onSelectContent
                         )
                     }
                 } else {
                     if (featuredItem != null) {
                         item {
-                            FeaturedHeroBanner(item = featuredItem, onPlay = { onSelectContent(featuredItem) })
+                            FeaturedHeroBanner(item = featuredItem)
                         }
                     }
 
                     when (currentSection) {
                         NavSection.MOVIES -> {
-                            item { CatalogRow("Popular", movies, isLowRam, onSelectContent) }
-                            item { CatalogRow("Top Rated", movies.reversed(), isLowRam, onSelectContent) }
+                            item { CatalogRow("Popular", movies, onSelectContent) }
+                            item { CatalogRow("Top Rated", movies.reversed(), onSelectContent) }
                         }
                         NavSection.SERIES -> {
-                            item { CatalogRow("Trending Series", series, isLowRam, onSelectContent) }
+                            item { CatalogRow("Trending Series", series, onSelectContent) }
                         }
                         NavSection.WATCHLIST -> {
-                            item { CatalogRow("My Watchlist", watchlist, isLowRam, onSelectContent) }
+                            item { CatalogRow("My Watchlist", watchlist, onSelectContent) }
                         }
                         NavSection.ADDONS -> {
                             item {
@@ -228,13 +226,13 @@ fun OttSidebar(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SidebarNavItem("🏠", "Home", selectedSection == NavSection.MOVIES) { onSelectSection(NavSection.MOVIES) }
+            SidebarNavItem("🏠", selectedSection == NavSection.MOVIES) { onSelectSection(NavSection.MOVIES) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🎬", "Series", selectedSection == NavSection.SERIES) { onSelectSection(NavSection.SERIES) }
+            SidebarNavItem("🎬", selectedSection == NavSection.SERIES) { onSelectSection(NavSection.SERIES) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🔖", "Watchlist", selectedSection == NavSection.WATCHLIST) { onSelectSection(NavSection.WATCHLIST) }
+            SidebarNavItem("🔖", selectedSection == NavSection.WATCHLIST) { onSelectSection(NavSection.WATCHLIST) }
             Spacer(modifier = Modifier.height(18.dp))
-            SidebarNavItem("🧩", "Addons", selectedSection == NavSection.ADDONS) { onSelectSection(NavSection.ADDONS) }
+            SidebarNavItem("🧩", selectedSection == NavSection.ADDONS) { onSelectSection(NavSection.ADDONS) }
         }
 
         Box(
@@ -250,7 +248,6 @@ fun OttSidebar(
 @Composable
 fun SidebarNavItem(
     symbol: String,
-    label: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -277,8 +274,7 @@ fun SidebarNavItem(
 
 @Composable
 fun FeaturedHeroBanner(
-    item: CatalogItem,
-    onPlay: () -> Unit
+    item: CatalogItem
 ) {
     Box(
         modifier = Modifier
@@ -368,7 +364,6 @@ fun FeaturedHeroBanner(
 fun CatalogRow(
     title: String,
     items: List<CatalogItem>,
-    isLowRam: Boolean,
     onSelect: (CatalogItem) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -534,7 +529,6 @@ fun DetailsDialog(
         }
     )
 }
-
 @Composable
 fun AddonManagerDialog(
     addons: List<InstalledAddon>,
