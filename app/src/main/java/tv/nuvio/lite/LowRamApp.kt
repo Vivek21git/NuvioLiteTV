@@ -1,33 +1,158 @@
-package tv.nuvio.lite
+package tv.nuvio.lite.player
 
-import android.app.ActivityManager
-import android.app.Application
 import android.content.Context
-import android.graphics.Bitmap
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.BitmapFactoryDecoder
-import coil.memory.MemoryCache
+import androidx.annotation.OptIn
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 
-class LowRamApp : Application(), ImageLoaderFactory {
+data class MediaTrackOption(
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val label: String,
+    val isSelected: Boolean
+)
 
-    val isLowRamDevice: Boolean by lazy {
-        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        am.isLowRamDevice
+@OptIn(UnstableApi::class)
+class LowRamPlayerManager(context: Context, isLowRam: Boolean) {
+
+    private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context).apply {
+        setParameters(buildUponParameters().setPreferredTextLanguage("en"))
+    }
+    private val player: ExoPlayer
+
+    init {
+        val allocator = DefaultAllocator(true, 64 * 1024)
+        val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(allocator)
+            .setBufferDurationsMs(
+                if (isLowRam) 5_000 else 15_000,
+                if (isLowRam) 20_000 else 40_000,
+                1_000,
+                2_000
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .setTargetBufferBytes(if (isLowRam) 14 * 1024 * 1024 else 40 * 1024 * 1024)
+            .build()
+
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(12_000)
+            .setUserAgent("Mozilla/5.0 (Linux; Android TV) AppleWebKit/537.36")
+
+        // HLS seeking extractor fix
+        val hlsExtractorFactory = androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory(
+            /* flags = */ androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
+            /* exposeCea608WhenMissingDeclarations = */ true
+        )
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
+        player = ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            // Ensures instantaneous snap to closest keyframe on scrub
+            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .setHandleAudioBecomingNoisy(true)
+            .build().apply {
+                playWhenReady = true
+            }
     }
 
-    override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
-            .bitmapConfig(Bitmap.Config.RGB_565)
-            .components {
-                add(BitmapFactoryDecoder.Factory())
-            }
-            .memoryCache {
-                MemoryCache.Builder(this)
-                    .maxSizePercent(if (isLowRamDevice) 0.10 else 0.25)
-                    .build()
-            }
-            .crossfade(false)
+    fun getPlayer(): ExoPlayer = player
+
+    fun play(url: String) {
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
             .build()
+        player.setMediaItem(mediaItem)
+        player.prepare()
+    }
+
+    // Direct, reliable scrubbing forward/rewind
+    fun seekRelative(offsetMs: Long) {
+        val current = player.currentPosition
+        val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+        val target = (current + offsetMs).coerceIn(0L, duration)
+        player.seekTo(target)
+    }
+
+    fun seekTo(positionMs: Long) {
+        val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+        player.seekTo(positionMs.coerceIn(0L, duration))
+    }
+
+    fun setSpeed(speed: Float) {
+        player.playbackParameters = PlaybackParameters(speed)
+    }
+
+    fun getAudioTracks(): List<MediaTrackOption> = getTracksForType(C.TRACK_TYPE_AUDIO)
+    fun getSubtitleTracks(): List<MediaTrackOption> = getTracksForType(C.TRACK_TYPE_TEXT)
+
+    private fun getTracksForType(trackType: Int): List<MediaTrackOption> {
+        val tracks = player.currentTracks
+        val result = mutableListOf<MediaTrackOption>()
+        for (groupIndex in 0 until tracks.groups.size) {
+            val group = tracks.groups[groupIndex]
+            if (group.type == trackType) {
+                for (trackIndex in 0 until group.length) {
+                    val format = group.getTrackFormat(trackIndex)
+                    val lang = format.language?.uppercase() ?: "Undetermined"
+                    val label = format.label ?: "$lang ${if (trackType == C.TRACK_TYPE_TEXT) "Subtitle" else "Audio"}"
+                    result.add(
+                        MediaTrackOption(
+                            groupIndex = groupIndex,
+                            trackIndex = trackIndex,
+                            label = label,
+                            isSelected = group.isTrackSelected(trackIndex)
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    fun selectTrack(option: MediaTrackOption) {
+        val tracks = player.currentTracks
+        if (option.groupIndex < tracks.groups.size) {
+            val group = tracks.groups[option.groupIndex].mediaTrackGroup
+            val override = TrackSelectionOverride(group, listOf(option.trackIndex))
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .setOverrideForType(override)
+                .build()
+        }
+    }
+
+    fun disableSubtitles() {
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .build()
+    }
+
+    fun stopAndRelease() {
+        player.stop()
+        player.clearMediaItems()
+        player.release()
     }
 }
