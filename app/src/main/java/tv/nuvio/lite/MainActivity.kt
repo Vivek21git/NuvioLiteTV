@@ -7,10 +7,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tv.nuvio.lite.addon.CatalogItem
 import tv.nuvio.lite.addon.InstalledAddon
+import tv.nuvio.lite.addon.StreamLink
 import tv.nuvio.lite.addon.StremioAddonManager
 import tv.nuvio.lite.player.PlayerActivity
 import tv.nuvio.lite.ui.TvHomeScreen
@@ -18,6 +21,7 @@ import tv.nuvio.lite.ui.TvHomeScreen
 class MainActivity : ComponentActivity() {
 
     private lateinit var addonManager: StremioAddonManager
+    private var searchJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +31,11 @@ class MainActivity : ComponentActivity() {
 
         var movies by mutableStateOf(emptyList<CatalogItem>())
         var series by mutableStateOf(emptyList<CatalogItem>())
+        var searchResults by mutableStateOf(emptyList<CatalogItem>())
         var addons by mutableStateOf(emptyList<InstalledAddon>())
+        var selectedItem by mutableStateOf<CatalogItem?>(null)
+        var streams by mutableStateOf(emptyList<StreamLink>())
+        var isStreamsLoading by mutableStateOf(false)
         var isLoading by mutableStateOf(true)
 
         fun loadCatalogs() {
@@ -49,17 +57,32 @@ class MainActivity : ComponentActivity() {
             TvHomeScreen(
                 movies = movies,
                 series = series,
+                searchResults = searchResults,
                 installedAddons = addons,
+                selectedItem = selectedItem,
+                availableStreams = streams,
+                isStreamsLoading = isStreamsLoading,
                 isLoading = isLoading,
                 isLowRam = app.isLowRamDevice,
+                onSearch = { query ->
+                    searchJob?.cancel()
+                    searchJob = lifecycleScope.launch {
+                        delay(400) // Debounce search input
+                        searchResults = addonManager.searchCatalog(query)
+                    }
+                },
+                onClearSearch = {
+                    searchJob?.cancel()
+                    searchResults = emptyList()
+                },
                 onAddAddon = { url ->
                     lifecycleScope.launch {
                         val success = addonManager.addAddonByUrl(url)
                         if (success) {
-                            Toast.makeText(this@MainActivity, "Addon installed successfully", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Addon installed", Toast.LENGTH_SHORT).show()
                             loadCatalogs()
                         } else {
-                            Toast.makeText(this@MainActivity, "Failed to load manifest from URL", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "Invalid addon manifest", Toast.LENGTH_LONG).show()
                         }
                     }
                 },
@@ -67,18 +90,26 @@ class MainActivity : ComponentActivity() {
                     addonManager.removeAddon(url)
                     loadCatalogs()
                 },
-                onItemSelected = { item ->
-                    playStreamDirect(item)
+                onSelectContent = { item ->
+                    selectedItem = item
+                    isStreamsLoading = true
+                    streams = emptyList()
+                    lifecycleScope.launch {
+                        streams = addonManager.resolveStreams(item.type, item.id)
+                        isStreamsLoading = false
+                    }
+                },
+                onCloseDetails = {
+                    selectedItem = null
+                    streams = emptyList()
+                },
+                onPlayStream = { streamUrl ->
+                    val intent = Intent(this@MainActivity, PlayerActivity::class.java).apply {
+                        putExtra("EXTRA_URL", streamUrl)
+                    }
+                    startActivity(intent)
                 }
             )
         }
-    }
-
-    private fun playStreamDirect(item: CatalogItem) {
-        val sampleHls = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-        val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("EXTRA_URL", sampleHls)
-        }
-        startActivity(intent)
     }
 }
