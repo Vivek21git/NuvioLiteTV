@@ -357,7 +357,7 @@ class PlayerActivity : ComponentActivity() {
                     options = audioTracks,
                     onDismiss = { showAudioDialog = false },
                     onSelect = { option ->
-                        manager.selectTrack(option)
+                        option?.let { manager.selectTrack(it) }
                         showAudioDialog = false
                     }
                 )
