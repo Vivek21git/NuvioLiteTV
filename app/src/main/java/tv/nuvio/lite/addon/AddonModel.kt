@@ -28,8 +28,8 @@ enum class NavSection(val title: String) {
     SETTINGS("Settings")
 }
 
-enum class AppTheme(val displayName: String) {
-    AMOLED_BLACK("AMOLED Black"),
-    COSMIC_PURPLE("Cosmic Purple"),
-    SPACE_BLUE("Space Blue")
+enum class AppTheme(val displayName: String, val bgHex: Long = 0, val surfaceHex: Long = 0, val accentHex: Long = 0) {
+    AMOLED_BLACK("AMOLED Black", 0xFF000000, 0xFF141414, 0xFFE50914),
+    COSMIC_PURPLE("Cosmic Purple", 0xFF0D0814, 0xFF191224, 0xFFA855F7),
+    SPACE_BLUE("Space Blue", 0xFF070B14, 0xFF0F1826, 0xFF38BDF8)
 }
